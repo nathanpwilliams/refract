@@ -55,7 +55,7 @@ async def create_job(req: CreateJobRequest, caller: Caller = Depends(require_aut
 async def job_status(job_id: str, caller: Caller = Depends(require_author)):
     row = await db.fetchrow_tenant(
         caller.tenant_id,
-        """select id, status, error, created_at, finished_at
+        """select id, status, error, target_version_id, created_at, finished_at
            from adaptation_jobs where tenant_id = $1 and id = $2""",
         job_id,
     )
