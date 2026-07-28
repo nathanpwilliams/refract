@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f7f8fa;
+  --panel: #ffffff;
+  --ink: #1a1f2b;
+  --muted: #5b6472;
+  --line: #e3e6ec;
+  --action: #3d4c9e;
+  --action-ink: #ffffff;
+  --accept: #1e7f4f;
+  --accept-bg: #e9f5ee;
+  --reject: #b3452f;
+  --reject-bg: #f9ece8;
+  --edit: #8a6d1f;
+  --edit-bg: #f7f1df;
+  --blocker: #b3452f;
+  --advisory: #8a6d1f;
+  --spectrum: linear-gradient(90deg, #3d4c9e 0%, #2e9e8f 55%, #d9a03d 100%);
+}
+
+body {
+  font-family: var(--font-ui), system-ui, sans-serif;
+}
+
+.content-mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Signature: the refraction edge marks machine-adapted content — and only that */
+.adapted-edge {
+  border-top: 3px solid transparent;
+  border-image: var(--spectrum) 1;
+}
+
+:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
