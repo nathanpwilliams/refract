@@ -19,7 +19,10 @@ async def lifespan(app: FastAPI):
     worker = asyncio.create_task(worker_loop(stop))
     yield
     stop.set()
-    await worker
+    try:
+        await asyncio.wait_for(worker, timeout=5)
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        worker.cancel()
     await db.close_pool()
 
 

@@ -52,12 +52,19 @@ async def worker_loop(stop: asyncio.Event) -> None:
             )
         except asyncio.TimeoutError:
             continue
-        except Exception as exc:  # noqa: BLE001 — job failures must not kill the loop
+        except Exception as exc:  # noqa: BLE001 — failures must not kill the loop
+            if job is None:
+                log.warning("worker: claim failed (%s); retrying in %ss",
+                            exc.__class__.__name__, poll * 2)
+                await asyncio.sleep(poll * 2)
+                continue
             log.exception("adaptation job failed")
-            if job is not None:
+            try:
                 await db.pool().execute(
                     """update adaptation_jobs
                        set status = 'failed', error = $2, finished_at = now()
                        where id = $1""",
                     job["id"], str(exc)[:2000],
                 )
+            except Exception:
+                log.warning("could not mark job failed (db unreachable)")
