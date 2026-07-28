@@ -7,7 +7,6 @@ class Settings(BaseSettings):
     # Supabase
     supabase_url: str                      # https://<project-ref>.supabase.co
     supabase_service_role_key: str         # server-side only; NEVER ship to frontend
-    supabase_jwt_secret: str               # Settings -> API -> JWT secret
     database_url: str                      # postgres connection string (pooler, port 6543)
 
     # Anthropic
