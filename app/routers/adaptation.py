@@ -4,11 +4,12 @@ the frontend can't do — the LLM pipeline and, later, SCORM packaging.
 """
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from app import db
 from app.deps import Caller, require_author
+from app.services import scorm
 
 router = APIRouter(prefix="/adaptation", tags=["adaptation"])
 
@@ -150,3 +151,24 @@ async def publish_version(version_id: str, caller: Caller = Depends(require_auth
         version_id,
     )
     return {"version_id": version_id, "status": "published"}
+
+
+@router.get("/versions/{version_id}/scorm")
+async def download_scorm(version_id: str, caller: Caller = Depends(require_author)):
+    """Export a published version as a downloadable SCORM 1.2 package."""
+    row = await db.fetchrow_tenant(
+        caller.tenant_id,
+        "select status from course_versions where tenant_id = $1 and id = $2",
+        version_id,
+    )
+    if row is None:
+        raise HTTPException(404, "Version not found")
+    if row["status"] != "published":
+        raise HTTPException(409, "Version is not published")
+
+    data = await scorm.build_package(version_id, caller.tenant_id)
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="scorm-{version_id}.zip"'},
+    )
