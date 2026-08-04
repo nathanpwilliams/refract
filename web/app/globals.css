@@ -48,3 +48,24 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==== APPEND to web/app/globals.css (do not replace the file) ==== */
+
+/* Learner-facing prose rendered from markdown */
+.prose-refract {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.prose-refract p { margin: 0.6em 0; }
+.prose-refract strong { font-weight: 600; }
+.prose-refract ul, .prose-refract ol { margin: 0.6em 0; padding-left: 1.4em; }
+.prose-refract li { margin: 0.25em 0; }
+.prose-refract a { color: var(--action); text-decoration: underline; text-underline-offset: 3px; }
+.prose-refract code {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.875em;
+  background: var(--paper);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
