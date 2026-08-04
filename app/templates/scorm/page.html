@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{TITLE}}</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="preview-badge" role="status" hidden>Preview — not connected to an LMS</div>
+
+    <header>
+      <p class="eyebrow">{{LABEL}} edition</p>
+      <h1>{{COURSE_TITLE}}</h1>
+      {{COURSE_DESC}}
+      <div class="progress" aria-hidden="true"><div class="progress-bar"></div></div>
+      <p class="progress-label"><span class="visited-count">0</span>/{{TOTAL}} lessons visited</p>
+      <p class="course-done" role="status" hidden>Course complete — every lesson finished.</p>
+    </header>
+
+    {{OBJECTIVES}}
+
+    <nav class="lesson-menu" aria-label="Lessons">
+      <h2>Lessons</h2>
+      <ol>
+        {{MENU}}
+      </ol>
+    </nav>
+
+    <main>
+      {{LESSONS}}
+    </main>
+
+    <div class="lesson-nav">
+      <button type="button" class="btn btn-ghost nav-prev" hidden>&larr; Previous lesson</button>
+      <span class="lesson-indicator" role="status"></span>
+      <button type="button" class="btn btn-primary nav-next">Next lesson &rarr;</button>
+    </div>
+  </div>
+
+  <script src="scorm-api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
