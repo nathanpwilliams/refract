@@ -33,6 +33,7 @@
   // ---------------------------------------------------------------- SCORM state
 
   function loadState() {
+    var legacy = false;
     var raw = Scorm.get("cmi.suspend_data");
     if (raw) {
       try {
@@ -41,6 +42,7 @@
           (s.completed_lessons || []).forEach(function (i) { visited[i] = true; });
           quizResults = s.quiz || {};
           if (typeof s.lesson_index === "number") current = s.lesson_index;
+          legacy = s.v !== 2;   // pre-v2 marked a lesson visited on ENTRY
         }
       } catch (e) { /* corrupt suspend data: start fresh */ }
     }
@@ -51,6 +53,11 @@
     }
     if (current < 0 || current >= total) current = 0;
 
+    // Navigate-away semantics: a lesson is "visited" only once left. Legacy
+    // (pre-v2) data counted the open lesson as visited on entry, so drop the
+    // resumed lesson from the visited set — it resumes as "In progress".
+    if (legacy) delete visited[current];
+
     // First launch: mark incomplete (don't clobber a prior passed/completed).
     var status = Scorm.get("cmi.core.lesson_status");
     if (status !== "passed" && status !== "completed" && status !== "failed") {
@@ -60,7 +67,7 @@
 
   function persist() {
     var payload = {
-      v: 1,
+      v: 2,   // v2: completed_lessons == lessons LEFT (navigate-away)
       lesson_index: current,
       completed_lessons: Object.keys(visited).map(Number),
       quiz: quizResults
@@ -118,22 +125,22 @@
       var idx = Number(item.dataset.index);
       var isCurrent = idx === current;
       item.setAttribute("aria-current", isCurrent ? "true" : "false");
+      var isVisited = !!visited[idx];
+      // The open lesson reads "In progress" until it is left; a lesson is
+      // "Visited" only after the learner navigates away from it.
+      var label = isCurrent ? "In progress" : (isVisited ? "Visited" : "Not visited");
+      item.classList.toggle("visited", isVisited && !isCurrent);
       var status = item.querySelector(".menu-status");
-      if (visited[idx]) {
-        item.classList.add("visited");
-        if (status) status.textContent = "Visited";
-      } else if (status && !isCurrent) {
-        status.textContent = "Not visited";
-      }
-      if (status && isCurrent && !visited[idx]) status.textContent = "Current";
+      if (status) status.textContent = label;
     });
   }
 
+  // Display a lesson. Entering does NOT mark it visited — that is earned by
+  // leaving it (see goTo). Used for the initial render and for resume.
   function showLesson(i, focus) {
     if (i < 0 || i >= total) return;
     current = i;
     lessons.forEach(function (el, idx) { el.hidden = idx !== i; });
-    visited[i] = true;
 
     if (prevBtn) prevBtn.hidden = i === 0;
     if (nextBtn) nextBtn.hidden = i === total - 1;
@@ -150,10 +157,18 @@
     if (typeof window.scrollTo === "function") window.scrollTo(0, 0);
   }
 
-  if (prevBtn) prevBtn.addEventListener("click", function () { showLesson(current - 1); });
-  if (nextBtn) nextBtn.addEventListener("click", function () { showLesson(current + 1); });
+  // Navigate to another lesson. You earn "visited" on the lesson you leave,
+  // mirroring the player's auto-complete-on-Next behavior.
+  function goTo(target) {
+    if (target < 0 || target >= total || target === current) return;
+    visited[current] = true;   // left the current lesson -> visited
+    showLesson(target);
+  }
+
+  if (prevBtn) prevBtn.addEventListener("click", function () { goTo(current - 1); });
+  if (nextBtn) nextBtn.addEventListener("click", function () { goTo(current + 1); });
   menuItems.forEach(function (item) {
-    item.addEventListener("click", function () { showLesson(Number(item.dataset.index)); });
+    item.addEventListener("click", function () { goTo(Number(item.dataset.index)); });
   });
 
   // ---------------------------------------------------------------- knowledge check
