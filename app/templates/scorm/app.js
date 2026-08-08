@@ -11,6 +11,8 @@
   var total = lessons.length;
   var quizForms = Array.prototype.slice.call(document.querySelectorAll(".quiz"));
   var finalQuizId = quizForms.length ? quizForms[quizForms.length - 1].dataset.quizId : null;
+  var lastIndex = total - 1;
+  var lastLesson = total ? lessons[lastIndex] : null;   // never "left" forward
 
   var visited = {};        // { index: true }
   var quizResults = {};    // { quizId: { passed: bool, score: number } }
@@ -303,6 +305,13 @@
       var passed = score >= passPct;
       quizResults[form.dataset.quizId] = { passed: passed, score: score };
       lockQuiz(form, score, passed);
+      // Final-lesson rule: passing the last lesson's quiz earns its "visited"
+      // (the last lesson is never navigated away from).
+      if (passed && lastLesson && lastLesson.contains(form)) {
+        visited[lastIndex] = true;
+        updateProgress();
+        updateMenu();
+      }
       persist();
     });
   });
@@ -313,6 +322,27 @@
     if (prior) lockQuiz(form, prior.score, prior.passed);
   });
 
+  // Final-lesson rule for a quiz-less last lesson: an explicit "Finish
+  // course" button (no scroll detection) earns its "visited" and runs the
+  // completion/status logic. A last lesson WITH a quiz uses the quiz instead.
+  function setupFinishButton() {
+    if (!lastLesson || lastLesson.querySelector(".quiz")) return;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-primary finish-course";
+    btn.textContent = "Finish course";
+    btn.style.marginTop = "1.5rem";
+    if (visited[lastIndex]) btn.disabled = true;
+    btn.addEventListener("click", function () {
+      visited[lastIndex] = true;
+      btn.disabled = true;
+      updateProgress();
+      updateMenu();
+      persist();   // evaluateCompletion + commit
+    });
+    lastLesson.appendChild(btn);
+  }
+
   // ---------------------------------------------------------------- boot
 
   Scorm.init();
@@ -320,6 +350,7 @@
   if (badge && Scorm.previewMode) badge.hidden = false;
 
   loadState();
+  setupFinishButton();   // after loadState so resume can pre-disable it
   showLesson(current, false);
 
   window.addEventListener("beforeunload", function () { Scorm.finish(); });
