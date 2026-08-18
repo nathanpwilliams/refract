@@ -498,13 +498,20 @@ async def ingest(tenant_slug: str) -> None:
 
             # --- canonical version: reuse in place (stable version_id).
             # Refraction versions (is_canonical = false) are never touched. ---
-            version_id = await conn.fetchval(
-                """select id from course_versions
+            canon = await conn.fetchrow(
+                """select id, status from course_versions
                    where tenant_id = $1 and course_id = $2 and is_canonical
                    order by created_at limit 1""",
                 tenant_id, course_id)
-            created_version = version_id is None
-            if version_id:
+            created_version = canon is None
+            if canon and canon["status"] == "published":
+                # A published version is immutable. In-place edits would mutate
+                # content learners have already been certified against.
+                raise SystemExit(
+                    "canonical is published; author changes require a new "
+                    "version — this protects published-version immutability")
+            if canon:
+                version_id = canon["id"]
                 await conn.execute(
                     "update course_versions set learning_objectives = $2 where id = $1",
                     version_id, json.dumps(OBJECTIVES))
