@@ -1,14 +1,31 @@
 #!/usr/bin/env bash
-# Fire an adaptation job. Usage: ./scripts/fire_job.sh "AEC v3"
-# Requires: uvicorn running; jq not required.
+# Fire an adaptation job.
+#
+# Usage: ./scripts/fire_job.sh [LABEL] [COURSE_ID] [AUDIENCE_PROFILE_ID]
+#   LABEL                version label for the new refraction (default: "managers v1")
+#   COURSE_ID            source course (default: flagship "AI at Work")
+#   AUDIENCE_PROFILE_ID  refraction target (default: "managers" profile)
+#
+# All three may also be set via env vars of the same name. Requires uvicorn
+# running. Examples:
+#   ./scripts/fire_job.sh                       # flagship + managers, label "managers v1"
+#   ./scripts/fire_job.sh "managers v2"         # same course/profile, new label
+#   ./scripts/fire_job.sh "AEC v3" "$CID" "$PID"
 set -euo pipefail
 
-LABEL="${1:?usage: fire_job.sh \"<version label>\"}"
+# Defaults: flagship "AI at Work" canonical course + "managers" audience profile
+# (stable across ingest re-runs; see scripts/ingest_canonical.py).
+LABEL="${1:-${LABEL:-managers v1}}"
+COURSE_ID="${2:-${COURSE_ID:-3a3984e7-10ca-4e98-9abf-32b8259139f1}}"
+AUDIENCE_PROFILE_ID="${3:-${AUDIENCE_PROFILE_ID:-9133a41b-705a-4de2-bf47-a8fe6e8b7b6b}}"
+
 SUPABASE_URL="https://djurpvzvjbttwqccptdo.supabase.co"
 PUBLISHABLE_KEY="sb_publishable_fNcigULYZ-c1_O2285k14Q_R5Wl3SSC"
-COURSE_ID="cd0fac68-0078-408c-b77e-326cbddae3a9"
-AUDIENCE_PROFILE_ID="640d3ede-864a-4c51-b956-56cfa3be3272"
 API="http://localhost:8000"
+
+echo "Course:   $COURSE_ID"
+echo "Audience: $AUDIENCE_PROFILE_ID"
+echo "Label:    $LABEL"
 
 read -p "Author email: " EMAIL
 read -s -p "Password: " PASSWORD; echo

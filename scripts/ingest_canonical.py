@@ -6,21 +6,28 @@ scenario structures with ✓/✗ / [quality] markers, and <!-- authoring
 note --> comments (stripped) — into the SAME canonical content-block
 shapes that scripts/seed.py produces.
 
-Target: a NEW course "AI at Work" in the existing demo tenant, with one
+Target: the course "AI at Work" in the existing demo tenant, with one
 canonical course_version, one module ("What AI actually is"), and the
-three Module-1 lessons as content_blocks. Also (re)creates the
-"managers" audience profile from the flagship architecture doc.
+three Module-1 lessons as content_blocks. Also upserts the "managers"
+audience profile from the flagship architecture doc.
 
-Idempotency: WIPE-AND-RELOAD. Each run deletes the "AI at Work" course
-in the demo tenant (cascading to its versions/modules/lessons/blocks)
-and rebuilds it, and upserts the managers audience profile by name.
-Nothing else in the tenant is touched.
+Idempotency: UPSERT-BY-TITLE, canonical UPDATED IN PLACE. The course is
+matched by title (stable course_id across runs) and its single canonical
+version is reused (stable version_id). Modules/lessons/content_blocks are
+reconciled BY POSITION — existing rows are updated in place (same ids),
+new positions inserted, trailing removed positions deleted only when
+unreferenced. Because canonical block ids are preserved, existing
+refraction versions (their copied blocks carry source_block_id lineage)
+and their block_revisions survive re-ingestion untouched. A canonical
+block that a refraction or revision still references is never deleted;
+if authoring removed such a block, ingestion aborts with a clear error
+rather than orphaning a refraction. No other course_versions are touched.
 
     source .venv/bin/activate
     python scripts/ingest_canonical.py
     python scripts/ingest_canonical.py --tenant-slug demo   # explicit
 
-Prints the new course_id, canonical version_id, and audience_profile_id.
+Prints the course_id, canonical version_id, and audience_profile_id.
 """
 import argparse
 import asyncio
@@ -353,8 +360,96 @@ def load_lessons() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# DB ingestion
+# DB ingestion — upsert-by-title, canonical version updated in place
 # ---------------------------------------------------------------------------
+
+async def _block_is_referenced(conn, block_id) -> bool:
+    """True if a refraction copy or a revision still depends on this
+    canonical block (source_block_id lineage or block_revisions.block_id)."""
+    return bool(await conn.fetchval(
+        """select exists(select 1 from block_revisions where block_id = $1)
+                or exists(select 1 from content_blocks where source_block_id = $1)""",
+        block_id))
+
+
+async def _reconcile_module(conn, tenant_id, version_id, position, title):
+    existing = await conn.fetchval(
+        "select id from modules where tenant_id = $1 and version_id = $2 and position = $3",
+        tenant_id, version_id, position)
+    if existing:
+        await conn.execute("update modules set title = $2 where id = $1", existing, title)
+        return existing
+    return await conn.fetchval(
+        """insert into modules (tenant_id, version_id, title, position)
+           values ($1, $2, $3, $4) returning id""",
+        tenant_id, version_id, title, position)
+
+
+async def _reconcile_lesson(conn, tenant_id, module_id, position, title, minutes):
+    existing = await conn.fetchval(
+        "select id from lessons where tenant_id = $1 and module_id = $2 and position = $3",
+        tenant_id, module_id, position)
+    if existing:
+        await conn.execute(
+            "update lessons set title = $2, estimated_minutes = $3 where id = $1",
+            existing, title, minutes)
+        return existing
+    return await conn.fetchval(
+        """insert into lessons (tenant_id, module_id, title, position, estimated_minutes)
+           values ($1, $2, $3, $4, $5) returning id""",
+        tenant_id, module_id, title, position, minutes)
+
+
+async def _reconcile_blocks(conn, tenant_id, lesson_id, blocks) -> None:
+    """Update canonical blocks in place by position; insert new positions;
+    delete trailing removed positions only when unreferenced."""
+    existing = {
+        r["position"]: r["id"]
+        for r in await conn.fetch(
+            "select id, position from content_blocks where tenant_id = $1 and lesson_id = $2",
+            tenant_id, lesson_id)
+    }
+    for pos, block in enumerate(blocks, start=1):
+        if pos in existing:
+            await conn.execute(
+                """update content_blocks
+                     set block_type = $2, content = $3, adaptable = $4
+                   where id = $1""",
+                existing[pos], block["t"], json.dumps(block["c"]), block["adaptable"])
+        else:
+            await conn.execute(
+                """insert into content_blocks
+                     (tenant_id, lesson_id, position, block_type, content, adaptable)
+                   values ($1, $2, $3, $4, $5, $6)""",
+                tenant_id, lesson_id, pos, block["t"], json.dumps(block["c"]),
+                block["adaptable"])
+    for pos, block_id in existing.items():
+        if pos > len(blocks):
+            if await _block_is_referenced(conn, block_id):
+                raise SystemExit(
+                    f"Refusing to delete canonical block at lesson {lesson_id} "
+                    f"position {pos}: an existing refraction or revision depends on "
+                    "it. Re-authoring that removes an already-adapted block needs a "
+                    "manual migration so refractions aren't orphaned.")
+            await conn.execute("delete from content_blocks where id = $1", block_id)
+
+
+async def _prune_trailing_lessons(conn, tenant_id, module_id, keep_max_position) -> None:
+    stale = await conn.fetch(
+        "select id, position from lessons where tenant_id = $1 and module_id = $2 and position > $3",
+        tenant_id, module_id, keep_max_position)
+    for row in stale:
+        blocks = await conn.fetch(
+            "select id from content_blocks where tenant_id = $1 and lesson_id = $2",
+            tenant_id, row["id"])
+        for b in blocks:
+            if await _block_is_referenced(conn, b["id"]):
+                raise SystemExit(
+                    f"Refusing to delete lesson at position {row['position']}: it "
+                    "contains a canonical block an existing refraction/revision "
+                    "depends on. Handle this authoring change with a manual migration.")
+        await conn.execute("delete from lessons where id = $1", row["id"])
+
 
 async def ingest(tenant_slug: str) -> None:
     lessons = load_lessons()
@@ -387,48 +482,55 @@ async def ingest(tenant_slug: str) -> None:
                        values ($1, $2, $3) returning id""",
                     tenant_id, MANAGERS_PROFILE_NAME, json.dumps(MANAGERS_PROFILE))
 
-            # --- wipe-and-reload the course ---
-            existing = await conn.fetchval(
+            # --- course: upsert by title (stable course_id) ---
+            course_id = await conn.fetchval(
                 "select id from courses where tenant_id = $1 and title = $2",
                 tenant_id, COURSE_TITLE)
-            if existing:
-                await conn.execute("delete from courses where id = $1", existing)
+            if course_id:
+                await conn.execute(
+                    "update courses set description = $2 where id = $1",
+                    course_id, COURSE_DESCRIPTION)
+            else:
+                course_id = await conn.fetchval(
+                    """insert into courses (tenant_id, title, description, created_by)
+                       values ($1, $2, $3, $4) returning id""",
+                    tenant_id, COURSE_TITLE, COURSE_DESCRIPTION, created_by)
 
-            course_id = await conn.fetchval(
-                """insert into courses (tenant_id, title, description, created_by)
-                   values ($1, $2, $3, $4) returning id""",
-                tenant_id, COURSE_TITLE, COURSE_DESCRIPTION, created_by)
-
+            # --- canonical version: reuse in place (stable version_id).
+            # Refraction versions (is_canonical = false) are never touched. ---
             version_id = await conn.fetchval(
-                """insert into course_versions
-                     (tenant_id, course_id, is_canonical, label, status,
-                      learning_objectives)
-                   values ($1, $2, true, 'Canonical', 'draft', $3)
-                   returning id""",
-                tenant_id, course_id, json.dumps(OBJECTIVES))
+                """select id from course_versions
+                   where tenant_id = $1 and course_id = $2 and is_canonical
+                   order by created_at limit 1""",
+                tenant_id, course_id)
+            created_version = version_id is None
+            if version_id:
+                await conn.execute(
+                    "update course_versions set learning_objectives = $2 where id = $1",
+                    version_id, json.dumps(OBJECTIVES))
+            else:
+                version_id = await conn.fetchval(
+                    """insert into course_versions
+                         (tenant_id, course_id, is_canonical, label, status,
+                          learning_objectives)
+                       values ($1, $2, true, 'Canonical', 'draft', $3)
+                       returning id""",
+                    tenant_id, course_id, json.dumps(OBJECTIVES))
 
-            module_id = await conn.fetchval(
-                """insert into modules (tenant_id, version_id, title, position)
-                   values ($1, $2, $3, 1) returning id""",
-                tenant_id, version_id, MODULE_TITLE)
+            # --- module / lessons / blocks: reconcile by position ---
+            module_id = await _reconcile_module(
+                conn, tenant_id, version_id, 1, MODULE_TITLE)
 
             block_counts: list[tuple[str, int]] = []
             for lesson in lessons:
-                lesson_id = await conn.fetchval(
-                    """insert into lessons
-                         (tenant_id, module_id, title, position, estimated_minutes)
-                       values ($1, $2, $3, $4, $5) returning id""",
-                    tenant_id, module_id, lesson["title"], lesson["position"],
-                    lesson["minutes"])
-                for b_pos, block in enumerate(lesson["blocks"], start=1):
-                    await conn.execute(
-                        """insert into content_blocks
-                             (tenant_id, lesson_id, position, block_type,
-                              content, adaptable)
-                           values ($1, $2, $3, $4, $5, $6)""",
-                        tenant_id, lesson_id, b_pos, block["t"],
-                        json.dumps(block["c"]), block["adaptable"])
+                lesson_id = await _reconcile_lesson(
+                    conn, tenant_id, module_id, lesson["position"],
+                    lesson["title"], lesson["minutes"])
+                await _reconcile_blocks(conn, tenant_id, lesson_id, lesson["blocks"])
                 block_counts.append((lesson["title"], len(lesson["blocks"])))
+            await _prune_trailing_lessons(
+                conn, tenant_id, module_id,
+                keep_max_position=max(l["position"] for l in lessons))
 
             # --- verification (inside the tx, before commit) ---
             total_blocks = await conn.fetchval(
@@ -444,7 +546,8 @@ async def ingest(tenant_slug: str) -> None:
                    order by l.position, cb.position""", module_id)
 
         # --- report ---
-        print("Ingested successfully (wipe-and-reload).\n")
+        action = "created" if created_version else "updated in place"
+        print(f"Ingested successfully (canonical version {action}).\n")
         print("Block counts per lesson:")
         for title, n in block_counts:
             print(f"  {n:>3}  {title}")
