@@ -171,8 +171,8 @@ heavily — as a collaborator on implementation, not as a substitute for
 deciding what gets built or for reading what lands. The architecture
 decisions here are mine and I can defend any of them; the code was
 written fast because of the tooling, and reviewed because fast is not
-the same as correct. Commits that were co-authored say so in their
-trailers.
+the same as correct. I'm the sole author of record on every commit, and
+I stand behind all of it.
 
 The irony is deliberate: a platform whose whole thesis is *machine work
 needs proof, not assurances* was built the same way.
