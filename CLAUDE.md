@@ -5,7 +5,9 @@ Refract (working name): an audience-adaptive course platform. Courses are
 stored as structured content blocks in Postgres (Supabase); an LLM pipeline
 "refracts" one canonical course into audience-specific versions; humans
 review every AI-adapted block before publish; published versions render in
-a Next.js player and (in progress) export as SCORM 1.2 packages.
+a Next.js player and export as SCORM 1.2 packages. The SCORM export shipped
+and passed SCORM Cloud acceptance in August 2026 (clean import, Passed with
+score reported, mid-course resume).
 
 ## Layout — TWO stacks in ONE repo
 - Repo root = Python backend (FastAPI). `app/` is PYTHON (services,
@@ -14,12 +16,18 @@ a Next.js player and (in progress) export as SCORM 1.2 packages.
 - `web/` = Next.js frontend (App Router, TypeScript, Tailwind v4).
   npm commands run inside `web/` only. `web/app/` is Next's app dir —
   do not confuse with the Python `app/`.
+- Next.js 16 has breaking changes from earlier versions: APIs,
+  conventions, and file structure may all differ from model training
+  data. Read the relevant guide in `web/node_modules/next/dist/docs/`
+  before writing frontend code, and heed deprecation notices.
 
 ## Architecture rules
 - Frontend talks to Supabase DIRECTLY under RLS (policies in migrations
-  0003/0004). The FastAPI service uses the service role (bypasses RLS),
-  so every backend query MUST be tenant-scoped — use the `db.*_tenant`
-  helpers, which assert a tenant_id predicate.
+  0003/0004). The FastAPI service connects to Postgres directly via
+  `DATABASE_URL` as the `postgres` role, which bypasses RLS — there is no
+  Supabase API key on the backend. So every backend query MUST be
+  tenant-scoped: use the `db.*_tenant` helpers, which assert a tenant_id
+  predicate.
 - The adaptation pipeline (PLAN → REWRITE → VERIFY → human review) lives
   in `app/services/`. Nothing publishes without human review: the publish
   endpoint refuses (409) while block_revisions are pending. Never weaken
@@ -43,6 +51,10 @@ a Next.js player and (in progress) export as SCORM 1.2 packages.
   commit actually contains. Commit only files related to the task; if
   other uncommitted changes exist, say so instead of sweeping them in.
 - Don't push unless explicitly asked; summarize diffs for review.
+- NEVER add AI attribution to a commit in this repo — no
+  `Co-Authored-By: Claude…`, no `Claude-Session:` trailer, no "Generated
+  with [Claude Code]" line, no equivalent in any form. This applies to
+  every commit, amend, and rebase, now and in future sessions.
 
 ## Environment quirks (hard-won)
 - macOS: Homebrew Python bottles can break on non-current macOS point
