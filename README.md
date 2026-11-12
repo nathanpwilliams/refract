@@ -103,10 +103,10 @@ active build.
 ### Tenant isolation, from two directions
 
 The frontend talks to Supabase **directly** under row-level security.
-The FastAPI service uses the service role and therefore bypasses RLS —
-so every backend query goes through `db.*_tenant` helpers that *assert*
-a `tenant_id` predicate is present rather than trusting the author of
-the query to remember one.
+The FastAPI service connects to Postgres directly as the `postgres` role
+and therefore bypasses RLS entirely — so every backend query goes through
+`db.*_tenant` helpers that *assert* a `tenant_id` predicate is present
+rather than trusting the author of the query to remember one.
 
 ### SCORM export
 
