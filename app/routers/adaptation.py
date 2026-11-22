@@ -65,11 +65,42 @@ async def job_status(job_id: str, caller: Caller = Depends(require_author)):
     return dict(row)
 
 
+@router.get("/jobs/{job_id}/evidence")
+async def job_evidence(job_id: str, caller: Caller = Depends(require_author)):
+    """The pipeline v2 warranty evidence for one run.
+
+    The data layer of the compliance file: which models ran, which prompt
+    versions, the touch rate, every deterministic check result, the merged
+    findings, the dispositions, and a sha256 over the canonical blocks the
+    run was derived from. Populated when the job reaches 'done' or
+    'halted'. PDF rendering is a later task.
+    """
+    row = await db.fetchrow_tenant(
+        caller.tenant_id,
+        """select status, error, evidence, profile_snapshot, plan
+           from adaptation_jobs where tenant_id = $1 and id = $2""",
+        job_id,
+    )
+    if row is None:
+        raise HTTPException(404, "Job not found")
+    if row["evidence"] is None:
+        raise HTTPException(409, f"Job has no evidence yet (status {row['status']})")
+    return {
+        "job_id": job_id,
+        "status": row["status"],
+        "error": row["error"],
+        "evidence": json.loads(row["evidence"]),
+        "profile_snapshot": json.loads(row["profile_snapshot"] or "null"),
+        "plan": json.loads(row["plan"] or "null"),
+    }
+
+
 @router.get("/jobs/{job_id}/revisions")
 async def list_revisions(job_id: str, caller: Caller = Depends(require_author)):
     rows = await db.fetch_tenant(
         caller.tenant_id,
-        """select id, block_id, original, generated, verifier_notes, review_status
+        """select id, block_id, original, generated, verifier_notes, review_status,
+                  reviewer, disposition_reason
            from block_revisions where tenant_id = $1 and job_id = $2""",
         job_id,
     )
@@ -81,6 +112,8 @@ async def list_revisions(job_id: str, caller: Caller = Depends(require_author)):
             "generated": json.loads(r["generated"]),
             "verifier_notes": json.loads(r["verifier_notes"] or "[]"),
             "review_status": r["review_status"],
+            "reviewer": r["reviewer"],
+            "disposition_reason": r["disposition_reason"],
         }
         for r in rows
     ]
@@ -101,11 +134,19 @@ async def review_revision(revision_id: str, req: ReviewRequest,
 
     rev = await db.fetchrow_tenant(
         caller.tenant_id,
-        "select block_id, original from block_revisions where tenant_id = $1 and id = $2",
+        """select block_id, original, reviewer from block_revisions
+           where tenant_id = $1 and id = $2""",
         revision_id,
     )
     if rev is None:
         raise HTTPException(404, "Revision not found")
+    if rev["reviewer"] == "pipeline_v2":
+        # Pipeline v2 runs have no human review path: a machine-disposed
+        # block belongs to a version that either published or halted, and a
+        # halted version is fixed by re-running, never by editing it.
+        raise HTTPException(
+            409, "Revision was disposed by pipeline_v2; re-run the refraction "
+                 "instead of editing the generated version")
 
     # rejected -> restore canonical content on the adapted block;
     # edited   -> apply the author's edit
@@ -132,6 +173,21 @@ async def review_revision(revision_id: str, req: ReviewRequest,
 
 @router.post("/versions/{version_id}/publish")
 async def publish_version(version_id: str, caller: Caller = Depends(require_author)):
+    version = await db.fetchrow_tenant(
+        caller.tenant_id,
+        "select status from course_versions where tenant_id = $1 and id = $2",
+        version_id,
+    )
+    if version is None:
+        raise HTTPException(404, "Version not found")
+    if version["status"] == "halted":
+        # A halted version failed the v2 warranty. It is a diagnostic
+        # artifact; publishing it by hand would route around the only gate
+        # this pipeline has.
+        raise HTTPException(
+            409, "Version halted by the pipeline's warranty checks — see the "
+                 "job's evidence, fix the canonical/profile/prompts, and re-run")
+
     pending = await db.fetchrow_tenant(
         caller.tenant_id,
         """select count(*) as n from block_revisions br
