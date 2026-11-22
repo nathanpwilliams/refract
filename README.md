@@ -164,18 +164,19 @@ POST /adaptation/versions/{id}/publish       409 while revisions are pending
 GET  /adaptation/versions/{id}/scorm         SCORM 1.2 zip (published only)
 ```
 
-## A note on how this was built
+## How this was built
 
-This is AI-assisted development under human review. I use Claude Code
-heavily — as a collaborator on implementation, not as a substitute for
-deciding what gets built or for reading what lands. The architecture
-decisions here are mine and I can defend any of them; the code was
-written fast because of the tooling, and reviewed because fast is not
-the same as correct. I'm the sole author of record on every commit, and
-I stand behind all of it.
+I built this project with a spec-driven, agentic workflow. For each
+subsystem I write a build brief covering the design decisions, the
+constraints, and the acceptance criteria. Claude Code implements against
+the brief, and the result has to pass before it merges: automated tests,
+plus acceptance runs against real systems, such as SCORM Cloud for the
+exporter.
 
-The irony is deliberate: a platform whose whole thesis is *machine work
-needs proof, not assurances* was built the same way.
+My work is the architecture, the specifications, and the decisions about
+what ships. Some of the larger design changes came from testing the
+pipeline's output and deciding it wasn't good enough. The move to sparse
+refraction is one example. The build briefs are in `docs/`.
 
 ## License
 
