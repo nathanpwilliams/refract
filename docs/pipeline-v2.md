@@ -45,8 +45,12 @@ survives in the constraint for the future `client_sme` tier).
   touch. The touch rate is logged and recorded in evidence; above 50% the
   run logs a planning smell (not a halt).
 - **REWRITE** receives only touched blocks, each with its own
-  instruction, and is told explicitly that returning a block unchanged is
-  an acceptable answer.
+  instruction, its canonical word count, and the computed
+  `allowed_word_count` range from `checks.length_bounds()` — the same
+  function the check judges by, so the instruction and the enforcement
+  cannot drift. It is told explicitly that returning a block unchanged is
+  an acceptable answer, and that assessments may change their setting but
+  never the decision being tested.
 - **CHECKS** run over the target version **read back from the database**,
   against the canonical. The warranty is a claim about what is stored,
   not about what the process believed it wrote.

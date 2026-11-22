@@ -269,6 +269,27 @@ async def run_job(job: dict) -> None:
 
 # ------------------------------------------------------------- stage helpers
 
+def _rewrite_payload(t: Touched) -> dict:
+    """One block as REWRITE sees it.
+
+    The word budget is handed over as computed numbers rather than left as a
+    percentage the model has to estimate: the first live run overran +/-30%
+    on five of nine touched blocks while faithfully following its
+    instructions, because "within 30%" is not something a model measures
+    mid-sentence.
+    """
+    words = checks.word_count(t.block.content)
+    low, high = checks.length_bounds(words)
+    return {
+        "block_id": t.block_id,
+        "block_type": t.block.block_type,
+        "adaptation_instruction": t.instruction,
+        "canonical_word_count": words,
+        "allowed_word_count": {"min": low, "max": high},
+        "content": t.block.content,
+    }
+
+
 async def _rewrite_lesson(tenant_id: str, lesson: LessonRun, profile: dict,
                           objectives: list, settings) -> None:
     """REWRITE one lesson's touched blocks and store the adapted content."""
@@ -278,15 +299,7 @@ async def _rewrite_lesson(tenant_id: str, lesson: LessonRun, profile: dict,
             audience_profile_json=json.dumps(profile),
             objectives_json=json.dumps(objectives),
             lesson_title=lesson.title,
-            blocks_json=json.dumps([
-                {
-                    "block_id": t.block_id,
-                    "block_type": t.block.block_type,
-                    "adaptation_instruction": t.instruction,
-                    "content": t.block.content,
-                }
-                for t in lesson.touched
-            ]),
+            blocks_json=json.dumps([_rewrite_payload(t) for t in lesson.touched]),
         ),
         temperature=settings.rewrite_temperature,
     )

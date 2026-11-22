@@ -381,6 +381,30 @@ def test_canonical_digest_is_order_sensitive_and_content_sensitive():
     assert checks.canonical_digest(mutated) != baseline
 
 
+@pytest.mark.parametrize("words,bounds", [
+    (100, (70, 130)), (10, (7, 13)), (3, (1, 5)), (1, (0, 3)), (0, (0, 2)),
+])
+def test_length_bounds_are_the_published_range(words, bounds):
+    assert checks.length_bounds(words) == bounds
+
+
+@pytest.mark.parametrize("before", [1, 3, 10, 35, 71, 100, 240])
+def test_the_bound_handed_to_rewrite_is_the_bound_enforced(before):
+    """REWRITE is given length_bounds(); the check must judge by the same."""
+    low, high = checks.length_bounds(before)
+    for after, expected in ((low, True), (high, True),
+                            (low - 1, False), (high + 1, False)):
+        if after < 0:
+            continue
+        canonical = [BlockView("b", 1, "text", True,
+                               {"markdown": " ".join(["word"] * before)})]
+        adapted = [BlockView("b", 1, "text", True,
+                             {"markdown": " ".join(["word"] * after)})]
+        outcome = checks.run_checks(canonical=canonical, adapted=adapted,
+                                    touched_ids={"b"}, profile={})
+        assert outcome.passed is expected, (before, after)
+
+
 @pytest.mark.parametrize("before,after,ok", [
     (100, 100, True), (100, 130, True), (100, 131, False),
     (100, 70, True), (100, 69, False), (10, 12, True), (10, 20, False),

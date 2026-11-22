@@ -26,8 +26,8 @@ always identifies the exact instructions that produced the version.
 """
 
 PROMPT_VERSIONS = {
-    "plan": "plan-v2.0",
-    "rewrite": "rewrite-v2.0",
+    "plan": "plan-v2.1",
+    "rewrite": "rewrite-v2.1",
     "verify": "verify-v2.0",
     "disposition": "disposition-v2.0",
     "quizgen": "quizgen-v1.0",
@@ -76,10 +76,23 @@ Expect to touch a MINORITY of the course's blocks. A touch list covering \
 most of a lesson means you are rewriting, not refracting — cut it back to \
 the blocks where the reason is concrete.
 
+ASSESSMENT BLOCKS ('knowledge_check', 'scenario') — you may touch these, \
+but only to move the SETTING. The decision being tested must survive \
+unchanged: the same judgment, the same correct option, correct for the same \
+reason. An adaptation_instruction for one of these blocks MUST say so \
+explicitly — name the setting to move it into, and state that the decision \
+under test does not change. If the block can only be made audience-specific \
+by changing WHAT is being judged (a question about whether a task suits AI \
+becoming a question about who is accountable for it), leave it off the touch \
+list: a drifted assessment is worse than a generic one.
+
 Each adaptation_instruction must be specific enough that a rewriter who \
 cannot see your reasoning knows exactly what to change and what to leave \
 alone. Name the artifact, scenario, or failure mode to use. Do not instruct \
-changes to facts, learning objectives, answer keys, or block structure.
+changes to facts, learning objectives, answer keys, or block structure. \
+Instructions must be achievable without lengthening the block — the rewriter \
+works under a hard word budget, so ask for substitution ("replace the RFI \
+example with X"), never addition ("also mention X").
 
 Respond with JSON only. No prose, no markdown fences."""
 
@@ -132,8 +145,16 @@ framing, examples, vocabulary, and scenarios — never the substance being taugh
 - Keep each block's type and structure. A 'text' block stays 'text'; a \
 'callout' keeps its variant. Return the same content keys you were given. Do \
 not merge, split, add, or delete blocks.
-- Rewritten length must stay within +/-30% of the original block's length. \
-This is checked by computation, not judgment, and a violation halts the run.
+- LENGTH IS A HARD BUDGET, NOT A GUIDELINE. Every block carries its \
+"canonical_word_count" and the "allowed_word_count" range computed from it. \
+Count the words you are about to return and keep the total inside that \
+range. This is checked by computation, not judgment: one block outside its \
+range halts the entire run, and the eight good blocks beside it are thrown \
+away with it.
+- Adapt by SUBSTITUTION, not addition. Replace the canonical's example with \
+this audience's example; do not keep the original and append theirs. If an \
+adaptation only works by adding a sentence, you are over budget — cut \
+something the canonical no longer needs, or return the block unchanged.
 - Pay close attention to the profile's ai_failure_modes when reshaping \
 scenarios: a scenario adapted for this audience should dramatize the \
 mistakes THIS role actually makes with AI, not a generic misuse. The same \
@@ -148,12 +169,20 @@ replacement image the author should source. Never remove alt_text.
 - For 'video_embed' blocks: adapt title and transcript_md framing only; keep \
 the url unchanged and set "video_note" if a different video is warranted.
 - Use plain professional language. No hype, no vendor endorsements.
-- For 'knowledge_check' and 'scenario' blocks: you may rewrite the question, \
-situation, option text, feedback, and consequence text for the audience — but \
-you must NEVER change which options are marked correct, the number of options, \
-the option ids, or any "quality" rating. The answer key is assessment design, \
-not prose. If adapting the wording would change what the correct answer should \
-be, return the block unchanged with a "reason" instead.
+- For 'knowledge_check' and 'scenario' blocks: CHANGE THE SETTING, NEVER THE \
+DECISION. You may move the question into this audience's world — their \
+artifacts, their roles, their documents — and rewrite the question, \
+situation, option text, feedback, and consequence text to match. What must \
+survive untouched is the judgment being tested: the same thing is being \
+decided, the same option is correct, and it is correct FOR THE SAME REASON. \
+You must never change which options are marked correct, the number of \
+options, the option ids, or any "quality" rating — the answer key is \
+assessment design, not prose. Re-read your rewrite and ask: is the learner \
+still deciding the same thing? If moving the setting drags the decision with \
+it — a question about whether a task suits AI becoming a question about who \
+is accountable for it — you cannot honor the instruction. Return the block \
+unchanged with a "reason" instead. An unchanged assessment costs nothing; a \
+drifted one invalidates the assessment.
 - RETURNING A BLOCK UNCHANGED IS AN ACCEPTABLE ANSWER. If the instruction \
 cannot be honored without harming the block — weakening the teaching, \
 straining the example, or changing meaning — return it unchanged with \
@@ -173,9 +202,10 @@ REWRITE_USER_TEMPLATE = """<audience_profile>
 {blocks_json}
 </lesson>
 
-Each block carries the "adaptation_instruction" written for it. Rewrite
-each one for this audience, or return it unchanged. Respond with JSON
-matching exactly:
+Each block carries the "adaptation_instruction" written for it, its
+"canonical_word_count", and the "allowed_word_count" range your rewrite
+must land inside. Rewrite each one for this audience, or return it
+unchanged. Respond with JSON matching exactly:
 {{
   "blocks": [
     {{

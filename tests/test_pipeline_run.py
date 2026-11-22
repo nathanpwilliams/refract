@@ -285,6 +285,28 @@ def test_only_touched_blocks_reach_the_rewriter(run):
     assert "c1" not in body
 
 
+def test_the_rewriter_is_handed_the_computed_word_budget(run):
+    """A percentage is something a model estimates; a range is something it
+    can obey. The first live run overran +/-30% on five of nine blocks."""
+    models = Models(PLAN_TOUCHING_2_AND_4, REWRITE_C2_ONLY_C4_UNCHANGED,
+                    [{"findings": []}, {"findings": []}], ACCEPT_BOTH)
+    run(models)
+
+    body = models.stage(prompts.REWRITE_SYSTEM)[0]["user"]
+    payload = json.loads(
+        body.split("<lesson title=", 1)[1].split(">", 1)[1]
+            .rsplit("</lesson>", 1)[0])
+    by_block = {b["block_id"]: b for b in payload}
+
+    canonical_c2 = next(b["content"] for b in CANONICAL_BLOCKS if b["position"] == 2)
+    words = checks.word_count(canonical_c2)
+    low, high = checks.length_bounds(words)
+    assert by_block["c2"]["canonical_word_count"] == words
+    assert by_block["c2"]["allowed_word_count"] == {"min": low, "max": high}
+    # and the prompt tells it the range is enforced by computation
+    assert "allowed_word_count" in models.stage(prompts.REWRITE_SYSTEM)[0]["system"]
+
+
 def test_untouched_and_locked_blocks_are_byte_identical_after_the_run(run):
     models = Models(PLAN_TOUCHING_2_AND_4, REWRITE_C2_ONLY_C4_UNCHANGED,
                     [{"findings": []}, {"findings": []}], ACCEPT_BOTH)

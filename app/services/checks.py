@@ -132,6 +132,19 @@ def word_count(content: dict) -> int:
     return sum(len(s.split()) for s in prose_strings(content))
 
 
+def length_bounds(words: int) -> tuple[int, int]:
+    """Allowed adapted word count for a canonical block of `words` words.
+
+    The single source of truth for the bound: _length_budget judges against
+    it, and REWRITE is handed the same numbers for each block it is asked to
+    adapt. A prompt that states the rule in its own words drifts from the
+    check that enforces it; a prompt handed the computed range cannot.
+    """
+    low = min(math.ceil(words * (1 - LENGTH_TOLERANCE)), words - LENGTH_FLOOR_WORDS)
+    high = max(math.floor(words * (1 + LENGTH_TOLERANCE)), words + LENGTH_FLOOR_WORDS)
+    return max(low, 0), high
+
+
 def canonical_digest(blocks: list[BlockView]) -> str:
     """sha256 over the ordered canonical block contents.
 
@@ -326,8 +339,7 @@ def _length_budget(block: BlockView, new: BlockView) -> CheckResult | None:
     if before == 0:
         return None                     # nothing text-bearing to bound
     after = word_count(new.content)
-    low = min(math.ceil(before * (1 - LENGTH_TOLERANCE)), before - LENGTH_FLOOR_WORDS)
-    high = max(math.floor(before * (1 + LENGTH_TOLERANCE)), before + LENGTH_FLOOR_WORDS)
+    low, high = length_bounds(before)
     if low <= after <= high:
         return CheckResult("length_budget", block.block_id, True,
                            f"{before} -> {after} words (allowed {low}-{high})")
