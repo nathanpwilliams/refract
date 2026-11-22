@@ -7,6 +7,9 @@ export interface Finding {
   detail: string;
   severity: "blocker" | "advisory";
   block_id: string;
+  /** which verifier raised it: "verify_a" | "verify_b" | "checks" (pipeline v2) */
+  source?: string;
+  model?: string;
 }
 
 export interface Revision {
@@ -21,7 +24,20 @@ export interface Revision {
     video_note?: string | null;
   };
   verifier_notes: Finding[];
-  review_status: "pending" | "accepted" | "edited" | "rejected";
+  /**
+   * pending/accepted/edited/rejected are human decisions (client_sme tier).
+   * auto_accepted/auto_reverted are pipeline v2 machine dispositions — those
+   * revisions are read-only here; the review endpoint rejects them.
+   */
+  review_status:
+    | "pending"
+    | "accepted"
+    | "edited"
+    | "rejected"
+    | "auto_accepted"
+    | "auto_reverted";
+  reviewer?: string | null;
+  disposition_reason?: string | null;
 }
 
 export interface JobStatus {

@@ -65,7 +65,11 @@ function FindingBadge({ finding }: { finding: Finding }) {
         {finding.severity}
       </span>
       <span>
-        <span className="font-medium">{finding.issue}</span> — {finding.detail}
+        <span className="font-medium">{finding.issue}</span>
+        {finding.source && (
+          <span className="text-[var(--muted)]"> ({finding.source})</span>
+        )}{" "}
+        — {finding.detail}
       </span>
     </li>
   );
@@ -78,6 +82,17 @@ const statusTint: Record<Revision["review_status"], string> = {
   accepted: "var(--accept-bg)",
   edited: "var(--edit-bg)",
   rejected: "var(--reject-bg)",
+  auto_accepted: "var(--accept-bg)",
+  auto_reverted: "var(--reject-bg)",
+};
+
+const statusLabel: Record<Revision["review_status"], string> = {
+  pending: "Pending",
+  accepted: "Accepted",
+  edited: "Edited",
+  rejected: "Rejected",
+  auto_accepted: "Auto-accepted",
+  auto_reverted: "Auto-reverted to canonical",
 };
 
 export function RevisionCard({
@@ -180,8 +195,19 @@ export function RevisionCard({
 
       <footer className="flex flex-wrap items-center gap-2 border-t border-[var(--line)] px-4 py-3">
         {decided ? (
-          <span className="text-sm font-semibold capitalize">
-            {revision.review_status}
+          <span className="text-sm">
+            <span className="font-semibold">
+              {statusLabel[revision.review_status]}
+            </span>
+            {revision.reviewer && (
+              <span className="text-[var(--muted)]"> · {revision.reviewer}</span>
+            )}
+            {revision.disposition_reason && (
+              <span className="text-[var(--muted)]">
+                {" "}
+                — {revision.disposition_reason}
+              </span>
+            )}
           </span>
         ) : editing ? (
           <>
