@@ -28,10 +28,30 @@ score reported, mid-course resume).
   Supabase API key on the backend. So every backend query MUST be
   tenant-scoped: use the `db.*_tenant` helpers, which assert a tenant_id
   predicate.
-- The adaptation pipeline (PLAN → REWRITE → VERIFY → human review) lives
-  in `app/services/`. Nothing publishes without human review: the publish
-  endpoint refuses (409) while block_revisions are pending. Never weaken
-  this gate.
+- The adaptation pipeline lives in `app/services/`. It is pipeline v2
+  (PLAN → REWRITE → CHECKS → VERIFY ×2 → DISPOSITION → auto-publish or
+  halt): no human is in the run, and the signature a reviewer used to
+  provide is carried by a machine warranty — see `docs/pipeline-v2.md`.
+  The gates that replace human review are load-bearing; never weaken
+  them:
+    * untouched blocks have NO model contact (copied from canonical), and
+      `adaptable=false` content is never sent to a model;
+    * `app/services/checks.py` is deterministic and any failure halts the
+      version;
+    * a `blocker` finding from EITHER verifier halts;
+    * the disposition stage's null preference is the canonical — every
+      unusable model response must resolve to revert, never accept;
+    * a halted version is a diagnostic artifact: the publish endpoint
+      refuses it (409), and `pipeline_v2`-disposed revisions cannot be
+      reviewed by hand. Fix a halt by changing the canonical, the
+      profile, or the prompts and re-running.
+  The human review API + `/review` UI still exist, unused by this flow,
+  for the future `client_sme` tier. v2 never writes
+  `review_status='pending'`, so the publish endpoint's pending-review 409
+  still stands behind it.
+- Bump the matching entry in `prompts.PROMPT_VERSIONS` whenever a
+  pipeline prompt's text changes — job evidence records it, and a stale
+  id makes an evidence file name instructions that never ran.
 - Job queue = `adaptation_jobs` table claimed with FOR UPDATE SKIP LOCKED
   by an in-process worker (`app/workers/runner.py`). No Redis/Celery.
 - Block content shapes are documented in the comments of
