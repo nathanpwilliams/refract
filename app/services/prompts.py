@@ -26,7 +26,7 @@ always identifies the exact instructions that produced the version.
 """
 
 PROMPT_VERSIONS = {
-    "plan": "plan-v2.1",
+    "plan": "plan-v2.2",
     "rewrite": "rewrite-v2.1",
     "verify": "verify-v2.0",
     "disposition": "disposition-v2.0",
@@ -85,6 +85,19 @@ under test does not change. If the block can only be made audience-specific \
 by changing WHAT is being judged (a question about whether a task suits AI \
 becoming a question about who is accountable for it), leave it off the touch \
 list: a drifted assessment is worse than a generic one.
+
+Before you propose a new setting, read the correct option's feedback or \
+consequence text and find the REASON it gives for being correct. If that \
+reason rests on a fact about the setting — the source document was never \
+provided, the figure was never verified, the tool was not approved, nobody \
+else had reviewed the work — then that fact belongs to the DECISION, not the \
+setting, and you may not move it. Test your proposed setting against that \
+reason before you write the instruction. A scenario whose correct answer is \
+"the model has never seen this document unless you provided it" CANNOT be \
+moved to someone pasting the document into the tool: the new setting makes \
+the correct answer's own reason false, and an instruction that asks for both \
+contradicts itself. When the setting and the reason cannot be separated, \
+leave the block off the touch list.
 
 Each adaptation_instruction must be specific enough that a rewriter who \
 cannot see your reasoning knows exactly what to change and what to leave \
