@@ -1,2 +1,7 @@
 -r requirements.txt
 pytest>=8.0
+# Drives the packaged SCORM player in a real browser
+# (tests/test_scorm_player.py). After installing:
+#     python -m playwright install chromium
+# Those tests skip, rather than fail, when the browser is absent.
+playwright>=1.49
