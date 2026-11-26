@@ -43,6 +43,23 @@ NON_PROSE_KEYS = frozenset({
 LENGTH_TOLERANCE = 0.30
 LENGTH_FLOOR_WORDS = 2
 
+# Which failures a per-block reversion can cure, and which cannot (§6).
+#
+# A touched block that fails length_budget, vocabulary_ban, or
+# answer_key_integrity has a defect that lives entirely in its own adapted
+# prose: restoring the canonical text removes it completely. The rest are
+# claims about the version itself — a block that was supposed to be copied
+# and wasn't, locked content that moved, a changed shape, or a reversion
+# that didn't take — and no amount of reverting makes them untrue.
+REVERTIBLE_CHECKS = frozenset({
+    "length_budget", "vocabulary_ban", "answer_key_integrity",
+})
+HALTING_CHECKS = frozenset({
+    "verbatim_integrity", "locked_integrity", "structure_integrity",
+    "revert_integrity",
+})
+ALL_CHECKS = REVERTIBLE_CHECKS | HALTING_CHECKS
+
 
 @dataclass(frozen=True)
 class BlockView:
@@ -245,6 +262,37 @@ def run_checks(
                 out.results.append(budget)
             out.results.extend(_vocabulary_ban(new, profile))
 
+    return out
+
+
+def check_reverted(*, canonical: list[BlockView], adapted: list[BlockView],
+                   reverted_ids: set[str]) -> list[CheckResult]:
+    """Re-check, from storage, that every reverted block IS the canonical.
+
+    The per-block fallback's own proof. Reverting is the pipeline's answer
+    to a defective adaptation, so "we reverted it" has to be verified the
+    same way everything else is — by reading the version back and comparing,
+    not by trusting that the UPDATE ran.
+    """
+    by_id = {b.block_id: b for b in adapted}
+    out: list[CheckResult] = []
+    for block in canonical:
+        if block.block_id not in reverted_ids:
+            continue
+        new = by_id.get(block.block_id)
+        if new is None:
+            out.append(CheckResult(
+                "revert_integrity", block.block_id, False,
+                "reverted block is absent from the adapted version"))
+        elif canonical_form(block.content) == canonical_form(new.content):
+            out.append(CheckResult(
+                "revert_integrity", block.block_id, True,
+                "reverted block identical to canonical"))
+        else:
+            out.append(CheckResult(
+                "revert_integrity", block.block_id, False,
+                f"reverted block at position {block.position} still differs "
+                "from canonical — the reversion did not take"))
     return out
 
 

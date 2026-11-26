@@ -56,20 +56,31 @@ survives in the constraint for the future `client_sme` tier).
   not about what the process believed it wrote.
 - **VERIFY** runs twice at temperature 0 on `VERIFY_MODEL_A` and
   `VERIFY_MODEL_B`; findings are merged with a `source` tag and never
-  de-duplicated (agreement is evidence).
+  de-duplicated (agreement is evidence). It is told not to judge length:
+  `length_budget` computes that with perfect recall, and in a live run
+  both verifiers raised blocker-severity length findings on a block the
+  computed check had passed — one of them saying mid-sentence that the
+  block was within tolerance.
 - **DISPOSITION** decides each touched block: `accept`,
   `revert_to_canonical`, or `halt`.
 
 ## The deterministic suite
 
-| Check | Scope | Fails when |
-|-------|-------|-----------|
-| `verbatim_integrity` | untouched blocks | content differs from canonical at all |
-| `locked_integrity` | `adaptable=false` blocks | content differs, **or** PLAN selected the block |
-| `answer_key_integrity` | `knowledge_check`, `scenario`, question shapes | option ids, option count, `correct` flags, or `quality` ratings changed |
-| `length_budget` | touched, text-bearing | word count outside ±30% (with a ±2-word floor) |
-| `structure_integrity` | every block + the version | `block_type` changed, a canonical content key dropped, or blocks added/removed/reordered |
-| `vocabulary_ban` | touched blocks | the profile's avoid-list terms appear in rewritten text |
+| Check | Scope | Fails when | On failure |
+|-------|-------|-----------|-----------|
+| `verbatim_integrity` | untouched blocks | content differs from canonical at all | **halt** |
+| `locked_integrity` | `adaptable=false` blocks | content differs, **or** PLAN selected the block | **halt** |
+| `structure_integrity` | every block + the version | `block_type` changed, a canonical content key dropped, or blocks added/removed/reordered | **halt** |
+| `revert_integrity` | reverted blocks | a reverted block is not byte-identical to canonical | **halt** |
+| `answer_key_integrity` | `knowledge_check`, `scenario`, question shapes | option ids, option count, `correct` flags, or `quality` ratings changed | revert the block |
+| `length_budget` | touched, text-bearing | word count outside ±30% (with a ±2-word floor) | revert the block |
+| `vocabulary_ban` | touched blocks | the profile's avoid-list terms appear in rewritten text | revert the block |
+
+`checks.REVERTIBLE_CHECKS` and `checks.HALTING_CHECKS` partition
+`ALL_CHECKS`, and a test enforces the partition — a new check cannot be
+added without deciding which side it belongs on. A revertible failure on
+a block nobody touched still halts: the rule is "one touched block's
+adapted prose", and anything else is a claim about the version.
 
 Three details worth knowing before you read a halt:
 
@@ -112,12 +123,42 @@ deterministic conformance to the canonical over six properties, plus two
 partially-independent model reviews, plus a reversion-biased AI
 disposition. Not: "two independent models agreed."
 
-## Publish and halt
+## Publish and halt — per-block fallback
 
-All checks pass, no blocker findings, no halt dispositions → the version
-is published (`status='published'`, `published_at=now()`) and the job is
-`done`. Otherwise the version is `halted` and `adaptation_jobs.error`
-summarizes the causes.
+Defects are handled per block, not per run. **A touched block that fails
+any deterministic check, or draws a `blocker` from either verifier, is
+reverted to canonical in code** — the disposition stage is never asked
+about it, because the checks and the blocker rule have already decided
+and the canonical text is the answer. The version then publishes with the
+adaptations that survive (`status='published'`, `published_at=now()`, job
+`done`).
+
+Reverting is proved, not assumed: the version is read back from storage
+and `revert_integrity` requires every reverted block to be byte-identical
+to its canonical.
+
+**The run halts only for what a reversion cannot cure:**
+
+| Halt condition | Why reversion doesn't help |
+|---|---|
+| an untouched or locked block failed integrity | the defect is that a block which should have been copied wasn't — there is no adaptation to withdraw |
+| `structure_integrity` failed | the claim is about the version's shape, not one block's prose |
+| a reverted block is not byte-identical to canonical | the reversion itself did not take |
+| zero adaptations survive | nothing was refracted; a byte-identical copy is not an audience version |
+| a halt disposition | §4 defines that decision as "something reversion doesn't fix" |
+
+Two consequences worth knowing. A blocker finding on a block id that was
+never touched is **recorded in evidence and not acted on** — the
+verifiers only ever see touched pairs, so an unmatched id describes
+nothing in the version, and halting on a model's typo would be a worse
+failure mode than ignoring it. And an empty touch list now halts rather
+than publishing a verbatim copy, under the zero-survivors rule.
+
+This is a deliberate revision of the brief's original §6 (all-or-nothing)
+after three live runs, each of which halted over one or two defective
+blocks while eight or nine good adaptations were discarded with them. The
+warranty is unchanged in what it permits to ship; what changed is the
+blast radius of a single bad block.
 
 **A halted version is a diagnostic artifact, not a review queue.** You
 fix it by changing the canonical, the profile, or the prompts and
@@ -147,6 +188,11 @@ layer — PDF rendering is a later task. Read it with
   string whenever a prompt's text changes**, or an evidence file will
   name instructions that no longer exist
 - `touch_rate` — touched, total, rate, and per-lesson counts
+- `adaptations` — `planned`, `surviving`, `reverted`, and
+  `reverted_blocks`: every reverted block with its cause and whether the
+  fallback or the disposition stage reverted it
+- `unattributed_blockers` — blocker findings naming a block that was
+  never touched; recorded, not acted on
 - `plan_warnings` — positions PLAN got wrong, locked blocks it selected
 - `checks` — the full tally plus every failure in full
 - `findings` — totals by source, and every blocker in full

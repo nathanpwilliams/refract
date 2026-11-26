@@ -28,7 +28,7 @@ always identifies the exact instructions that produced the version.
 PROMPT_VERSIONS = {
     "plan": "plan-v2.2",
     "rewrite": "rewrite-v2.1",
-    "verify": "verify-v2.0",
+    "verify": "verify-v2.1",
     "disposition": "disposition-v2.0",
     "quizgen": "quizgen-v1.0",
 }
@@ -241,27 +241,35 @@ You compare original content blocks against their adapted versions and report \
 problems. You do not rewrite anything.
 
 You are one of two independent verifiers running on different models. Your \
-findings are merged with the other's, and a single 'blocker' from either of \
-you stops the version from publishing. So: report what you can point at in \
-the text, and do not soften a real problem on the assumption that someone \
-else will catch it.
+findings are merged with the other's. A 'blocker' from either of you causes \
+that ONE BLOCK to be reverted to its canonical text; the rest of the version \
+still publishes. So a blocker costs one adaptation, not the run — report \
+what you can point at in the text, do not soften a real problem on the \
+assumption the other verifier will catch it, and do not inflate a stylistic \
+preference into a blocker to be safe.
+
+DO NOT JUDGE LENGTH. Block length is measured by code, exactly, against a \
+computed budget, and a violation is caught with certainty before you ever \
+see the pair. You cannot count words reliably and you are not asked to: a \
+length finding from you can only be noise, and noise here costs a correct \
+adaptation. Say nothing about how long or short the adapted block is.
 
 Check every adapted block for:
 1. fact_drift      — factual claims added, removed, or altered
 2. objective_drift — content no longer supports the stated learning objectives
 3. tone_violation  — hype, informality, vendor endorsement, or condescension
 4. a11y_regression — missing/degraded alt_text, transcript, or caption
-5. length_violation — outside +/-30% of original length
-6. structure_violation — block type or content shape changed
-7. answer_key_violation — in knowledge_check/scenario blocks: any change to \
+5. structure_violation — block type or content shape changed
+6. answer_key_violation — in knowledge_check/scenario blocks: any change to \
 which options are correct, option count/ids, or quality ratings; or rewritten \
 wording that makes the marked-correct answer no longer clearly correct
-8. unwarranted_change — the adaptation instruction was not honored, or the \
+7. unwarranted_change — the adaptation instruction was not honored, or the \
 rewrite changed wording without changing meaning for this audience (synonym \
 churn). Report this as 'advisory': the next stage decides whether to revert.
 
-Severity: "blocker" (must not publish) or "advisory" (feeds the disposition \
-stage, which may revert the block to canonical).
+Severity: "blocker" (this block must not ship as adapted — it is reverted to \
+canonical) or "advisory" (feeds the disposition stage, which weighs whether \
+the adaptation earned its place).
 Respond with JSON only. No prose, no markdown fences."""
 
 VERIFY_USER_TEMPLATE = """<learning_objectives>
@@ -280,7 +288,7 @@ matching exactly:
   "findings": [
     {{
       "block_id": "<uuid>",
-      "issue": "fact_drift|objective_drift|tone_violation|a11y_regression|length_violation|structure_violation|answer_key_violation|unwarranted_change",
+      "issue": "fact_drift|objective_drift|tone_violation|a11y_regression|structure_violation|answer_key_violation|unwarranted_change",
       "severity": "blocker|advisory",
       "detail": "one sentence describing the specific problem"
     }}

@@ -44,12 +44,17 @@ REVIEWER = "pipeline_v2"
 Completion = Callable[..., Awaitable[dict]]
 
 
+FALLBACK = "fallback"       # reverted in code, before this stage saw it
+STAGE = "disposition"
+
+
 @dataclass(frozen=True)
 class Disposition:
     block_id: str
     decision: str
     reason: str
     unchanged_by_rewrite: bool = False
+    decided_by: str = STAGE
 
     @property
     def review_status(self) -> str:
@@ -57,8 +62,21 @@ class Disposition:
 
     def to_dict(self) -> dict:
         return {"block_id": self.block_id, "decision": self.decision,
-                "reason": self.reason,
+                "reason": self.reason, "decided_by": self.decided_by,
                 "unchanged_by_rewrite": self.unchanged_by_rewrite}
+
+
+def fallback_revert(block_id: str, causes: list[str]) -> Disposition:
+    """The per-block fallback's record for a block reverted in code.
+
+    A defective adaptation is reverted by the pipeline, not by asking a
+    model what to do about it: the deterministic checks and the blocker
+    rule have already decided, and the canonical text is the answer.
+    """
+    return Disposition(
+        block_id, REVERT,
+        "reverted by the per-block fallback — " + "; ".join(causes),
+        decided_by=FALLBACK)
 
 
 def normalize(raw: dict, block_id: str) -> Disposition:
@@ -167,6 +185,10 @@ def summary(dispositions: list[Disposition]) -> dict:
         "accepted": counts[ACCEPT],
         "reverted": counts[REVERT],
         "halted": counts[HALT],
+        "reverted_by_fallback": sum(1 for d in dispositions
+                                    if d.decision == REVERT and d.decided_by == FALLBACK),
+        "reverted_by_stage": sum(1 for d in dispositions
+                                 if d.decision == REVERT and d.decided_by == STAGE),
         "unchanged_by_rewrite": sum(1 for d in dispositions if d.unchanged_by_rewrite),
         "halt_reasons": [
             {"block_id": d.block_id, "reason": d.reason}

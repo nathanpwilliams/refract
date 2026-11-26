@@ -2,8 +2,8 @@
 
 run_job() drives one adaptation_jobs row through:
 
-    planning -> rewriting -> checking -> verifying -> disposing
-             -> done (version auto-published) | halted
+    planning -> rewriting -> checking -> verifying -> [fallback]
+             -> disposing -> done (version auto-published) | halted
 
 Design principle: THE CANONICAL IS HUMAN-WARRANTED ONCE; EVERY REFRACTION
 IS A MACHINE-PROVEN BOUNDED TRANSFORMATION OF IT. There is no human review
@@ -19,7 +19,17 @@ carried by, in order of strength:
   4. disposition.py— AI review of each touched block whose null preference
                      is the canonical: in doubt, revert.
 
-A run that clears all four auto-publishes. A run that doesn't HALTS, and a
+Failures are handled PER BLOCK, not per run (§6). A touched block that
+fails a deterministic check or draws a blocker from either verifier is
+reverted to canonical IN CODE — not by asking the disposition stage what
+it thinks — and the version publishes with the adaptations that survive.
+Reverting is verified like everything else: the version is read back and
+every reverted block must be byte-identical to its canonical.
+
+The run HALTS only for what a reversion cannot cure: an untouched or
+locked block that failed integrity, a structure_integrity failure, a
+reverted block that is not byte-identical, zero surviving adaptations, or
+a halt disposition (the stage's way of saying reversion is not enough). A
 halted version is a diagnostic artifact, not a review queue: you fix it by
 changing the canonical, the profile, or the prompts and re-running — never
 by editing the halted version.
@@ -69,6 +79,7 @@ class Touched:
     adapted: dict = field(default_factory=dict)
     generated: dict = field(default_factory=dict)
     unchanged: bool = True
+    reverted_by: str | None = None    # 'fallback' | 'disposition' | None
 
     @property
     def block_id(self) -> str:
@@ -183,11 +194,33 @@ async def run_job(job: dict) -> None:
 
     all_findings = [f for fs in findings_by_lesson.values() for f in fs]
 
-    # ---- Stage 5: DISPOSITION (AI review; canonical wins ties) ---------
-    await _set_status(tenant_id, job_id, "disposing")
-    all_dispositions: list[dispo.Disposition] = []
+    # ---- Stage 5: per-block fallback, in code --------------------------
+    # Every defect that a reversion can cure is cured here, by the pipeline,
+    # before any model is asked for an opinion about it. A blocked block
+    # becomes canonical again; the version keeps the adaptations that
+    # survive. What a reversion cannot cure is collected for the halt.
+    touched_ids = {t.block_id for l in lessons for t in l.touched}
+    reverts, integrity_halts, unattributed = _triage(outcome, all_findings, touched_ids)
     for lesson in lessons:
-        if not lesson.touched:
+        for t in lesson.touched:
+            if t.block_id not in reverts:
+                continue
+            t.reverted_by = dispo.FALLBACK
+            if not t.unchanged:
+                await _write_block_content(tenant_id, lesson.target_lesson_id,
+                                           t.block_id, t.block.content)
+    if reverts:
+        log.info("fallback reverted %d of %d adaptations", len(reverts),
+                 touched_blocks)
+
+    # ---- Stage 6: DISPOSITION on the survivors -------------------------
+    await _set_status(tenant_id, job_id, "disposing")
+    all_dispositions: list[dispo.Disposition] = [
+        dispo.fallback_revert(block_id, causes)
+        for block_id, causes in reverts.items()
+    ]
+    for lesson in lessons:
+        if not any(t.reverted_by is None for t in lesson.touched):
             continue
         decided = await dispo.dispose_lesson(
             lesson_title=lesson.title,
@@ -202,13 +235,25 @@ async def run_job(job: dict) -> None:
                     "adapted": t.adapted,
                     "unchanged": t.unchanged,
                 }
-                for t in lesson.touched
+                for t in lesson.touched if t.reverted_by is None
             ],
             findings=findings_by_lesson.get(lesson.lesson_id, []),
         )
         for t in lesson.touched:
+            if t.reverted_by is not None:
+                continue
             d = decided.get(t.block_id) or dispo.normalize({}, t.block_id)
             all_dispositions.append(d)
+            if d.decision != dispo.ACCEPT:
+                t.reverted_by = dispo.STAGE
+
+    # ---- Record every touched block, however it was decided ------------
+    by_block = {d.block_id: d for d in all_dispositions}
+    for lesson in lessons:
+        for t in lesson.touched:
+            d = by_block.get(t.block_id)
+            if d is None:
+                continue
             await _record_disposition(
                 tenant_id, job_id, lesson, t, d,
                 notes=[f for f in findings_by_lesson.get(lesson.lesson_id, [])
@@ -216,10 +261,35 @@ async def run_job(job: dict) -> None:
                       + check_failures_by_block.get(t.block_id, []),
             )
 
-    # ---- Stage 6: publish or halt --------------------------------------
-    blocking_findings = verifiers.blockers(all_findings)
+    # ---- Stage 7: final read-back, then publish or halt ----------------
+    # One more read from storage: it proves every reversion took, and it is
+    # where the surviving-adaptation count comes from. Counting what the
+    # pipeline believes it wrote would defeat the point.
+    final_blocks = [b for l in await _load_lessons(tenant_id, target_version,
+                                                   canonical=False)
+                    for b in l.blocks]
+    final_by_id = {b.block_id: b for b in final_blocks}
+    reverted_ids = {t.block_id for l in lessons for t in l.touched
+                    if t.reverted_by is not None}
+    revert_results = checks.check_reverted(
+        canonical=canonical_blocks, adapted=final_blocks,
+        reverted_ids=reverted_ids)
+    outcome.results.extend(revert_results)
+
+    surviving = [
+        t.block_id for l in lessons for t in l.touched
+        if t.block_id in final_by_id
+        and (checks.canonical_form(final_by_id[t.block_id].content)
+             != checks.canonical_form(t.block.content))
+    ]
     halt_dispositions = [d for d in all_dispositions if d.decision == dispo.HALT]
-    halt_causes = _halt_causes(outcome, blocking_findings, halt_dispositions)
+    halt_causes = _halt_causes(
+        integrity_halts=integrity_halts,
+        revert_failures=[r for r in revert_results if not r.passed],
+        planned=touched_blocks,
+        surviving=len(surviving),
+        halt_dispositions=halt_dispositions,
+    )
 
     evidence = {
         "pipeline_version": PIPELINE_VERSION,
@@ -244,8 +314,19 @@ async def run_job(job: dict) -> None:
             ],
         },
         "plan_warnings": plan_warnings,
+        "adaptations": {
+            "planned": touched_blocks,
+            "surviving": len(surviving),
+            "reverted": len(reverted_ids),
+            "reverted_blocks": [
+                {"block_id": d.block_id, "reverted_by": d.decided_by,
+                 "causes": reverts.get(d.block_id) or [d.reason]}
+                for d in all_dispositions if d.decision != dispo.ACCEPT
+            ],
+        },
         "checks": outcome.summary(),
         "findings": verifiers.findings_summary(all_findings),
+        "unattributed_blockers": unattributed,
         "dispositions": dispo.summary(all_dispositions),
         "canonical": {
             "version_id": source_version,
@@ -374,23 +455,71 @@ def _findings_from_checks(outcome: checks.CheckOutcome) -> dict[str, list[dict]]
     return out
 
 
-def _halt_causes(outcome: checks.CheckOutcome, blocking_findings: list[dict],
+def _triage(outcome: checks.CheckOutcome, findings: list[dict],
+            touched_ids: set[str]) -> tuple[dict[str, list[str]], list[str], list[str]]:
+    """Sort every defect into what a reversion cures and what it doesn't.
+
+    Returns (reverts, integrity_halts, unattributed_blockers).
+
+    A failure is revertible only when it is a claim about ONE TOUCHED
+    BLOCK'S adapted prose. Anything else — a version-level failure, a
+    failure on a block nobody touched, or any of the HALTING_CHECKS —
+    describes the version rather than a block, and reverting a block would
+    leave the claim just as true.
+    """
+    reverts: dict[str, list[str]] = {}
+    integrity_halts: list[str] = []
+
+    for r in outcome.failures:
+        cause = f"{r.check}: {r.detail}"
+        if (r.block_id is None
+                or r.block_id not in touched_ids
+                or r.check in checks.HALTING_CHECKS):
+            integrity_halts.append(cause)
+        else:
+            reverts.setdefault(r.block_id, []).append(cause)
+
+    unattributed: list[str] = []
+    for f in verifiers.blockers(findings):
+        block_id = str(f.get("block_id"))
+        cause = (f"{f.get('source')}/{f.get('issue')}: {f.get('detail')}")
+        if block_id in touched_ids:
+            reverts.setdefault(block_id, []).append(cause)
+        else:
+            # The verifiers only ever saw touched pairs, so a blocker on an
+            # id that is not one of them describes nothing in the version.
+            # Recorded, not acted on: halting on a model's typo would be a
+            # worse failure mode than ignoring it.
+            unattributed.append(f"{cause} (block_id {block_id} was not touched)")
+    return reverts, integrity_halts, unattributed
+
+
+def _halt_causes(*, integrity_halts: list[str],
+                 revert_failures: list[checks.CheckResult],
+                 planned: int, surviving: int,
                  halt_dispositions: list[dispo.Disposition]) -> list[str]:
+    """The four conditions a per-block reversion cannot answer, plus one.
+
+    §6: halt when an untouched or locked block fails integrity, when
+    structure_integrity fails, when a reverted block is not byte-identical
+    to canonical, or when zero adaptations survive. A halt DISPOSITION is
+    kept as a halt cause because that decision means precisely "reverting
+    does not fix this" — the one thing the fallback cannot absorb.
+    """
     causes: list[str] = []
-    if outcome.failures:
-        by_check: dict[str, int] = {}
-        for r in outcome.failures:
-            by_check[r.check] = by_check.get(r.check, 0) + 1
+    if integrity_halts:
         causes.append(
-            "deterministic checks failed: "
-            + ", ".join(f"{k} x{v}" for k, v in sorted(by_check.items()))
-            + f" (first: {outcome.failures[0].detail})")
-    if blocking_findings:
-        f = blocking_findings[0]
+            f"{len(integrity_halts)} integrity failure(s) a reversion cannot "
+            f"cure (first: {integrity_halts[0]})")
+    if revert_failures:
         causes.append(
-            f"{len(blocking_findings)} blocker finding(s) from verification "
-            f"(first: {f.get('source')}/{f.get('issue')} on block "
-            f"{f.get('block_id')}: {f.get('detail')})")
+            f"{len(revert_failures)} reverted block(s) not byte-identical to "
+            f"canonical (first: {revert_failures[0].detail})")
+    if surviving == 0:
+        causes.append(
+            "no adaptations survived: PLAN touched no blocks"
+            if planned == 0 else
+            f"no adaptations survived: all {planned} were reverted")
     if halt_dispositions:
         causes.append(
             f"{len(halt_dispositions)} halt disposition(s) "

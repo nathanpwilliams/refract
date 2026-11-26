@@ -143,27 +143,109 @@ def test_check_failures_become_blocker_findings_per_block():
     assert by_block["b2"][0]["issue"] == "length_budget"
 
 
-def test_halt_causes_name_every_failing_gate():
+# ------------------------------------------------------- per-block triage (§6)
+
+def _outcome(*results):
+    from app.services import checks
+    return checks.CheckOutcome(results=list(results))
+
+
+def test_a_touched_block_failing_a_revertible_check_is_reverted():
+    from app.services import checks
+
+    reverts, halts, unattributed = pipeline._triage(
+        _outcome(checks.CheckResult("length_budget", "b2", False,
+                                    "41 -> 58 words (+41%)")),
+        [], touched_ids={"b2"})
+
+    assert list(reverts) == ["b2"]
+    assert "length_budget" in reverts["b2"][0]
+    assert halts == [] and unattributed == []
+
+
+def test_a_blocker_on_a_touched_block_is_reverted():
+    reverts, halts, _ = pipeline._triage(
+        _outcome(),
+        [{"block_id": "b2", "issue": "fact_drift", "severity": "blocker",
+          "detail": "invented a figure", "source": "verify_b"},
+         {"block_id": "b2", "issue": "tone_violation", "severity": "advisory",
+          "detail": "slightly brisk", "source": "verify_a"}],
+        touched_ids={"b2"})
+
+    assert reverts["b2"] == ["verify_b/fact_drift: invented a figure"]
+    assert halts == []          # advisories never revert on their own
+
+
+def test_halting_checks_are_never_reverted():
+    from app.services import checks
+
+    for check in sorted(checks.HALTING_CHECKS):
+        reverts, halts, _ = pipeline._triage(
+            _outcome(checks.CheckResult(check, "b2", False, "broken")),
+            [], touched_ids={"b2"})
+        assert reverts == {}, check
+        assert len(halts) == 1, check
+
+
+def test_a_failure_on_an_untouched_block_halts_even_if_revertible():
+    from app.services import checks
+
+    reverts, halts, _ = pipeline._triage(
+        _outcome(checks.CheckResult("answer_key_integrity", "b9", False,
+                                    "answer key changed")),
+        [], touched_ids={"b2"})
+    assert reverts == {}
+    assert "answer_key_integrity" in halts[0]
+
+
+def test_a_version_level_failure_halts():
+    from app.services import checks
+
+    _, halts, _ = pipeline._triage(
+        _outcome(checks.CheckResult("structure_integrity", None, False,
+                                    "block sequence differs")),
+        [], touched_ids={"b2"})
+    assert "block sequence differs" in halts[0]
+
+
+def test_a_blocker_naming_an_untouched_block_is_set_aside():
+    reverts, halts, unattributed = pipeline._triage(
+        _outcome(),
+        [{"block_id": "made-up", "issue": "fact_drift", "severity": "blocker",
+          "detail": "about nothing", "source": "verify_a"}],
+        touched_ids={"b2"})
+
+    assert reverts == {} and halts == []
+    assert "was not touched" in unattributed[0]
+
+
+def test_halt_causes_name_every_condition_a_reversion_cannot_cure():
     from app.services import checks
     from app.services import disposition as dispo
 
-    outcome = checks.CheckOutcome(results=[
-        checks.CheckResult("answer_key_integrity", "b4", False,
-                           "answer key changed — 'a': True -> False"),
-    ])
     causes = pipeline._halt_causes(
-        outcome,
-        [{"block_id": "b2", "issue": "fact_drift", "severity": "blocker",
-          "detail": "invented a figure", "source": "verify_b"}],
-        [dispo.Disposition("b1", dispo.HALT, "canonical is wrong for this role")],
-    )
+        integrity_halts=["locked_integrity: locked block differs"],
+        revert_failures=[checks.CheckResult("revert_integrity", "b2", False,
+                                            "reversion did not take")],
+        planned=3, surviving=0,
+        halt_dispositions=[dispo.Disposition("b1", dispo.HALT,
+                                             "canonical is wrong for this role")])
 
-    assert len(causes) == 3
-    assert "answer_key_integrity x1" in causes[0]
-    assert "verify_b/fact_drift" in causes[1]
-    assert "canonical is wrong for this role" in causes[2]
+    assert len(causes) == 4
+    assert "locked_integrity" in causes[0]
+    assert "not byte-identical" in causes[1]
+    assert "all 3 were reverted" in causes[2]
+    assert "canonical is wrong for this role" in causes[3]
 
 
-def test_no_causes_when_everything_is_clean():
-    from app.services import checks
-    assert pipeline._halt_causes(checks.CheckOutcome(), [], []) == []
+def test_surviving_adaptations_mean_no_halt():
+    assert pipeline._halt_causes(
+        integrity_halts=[], revert_failures=[], planned=3, surviving=2,
+        halt_dispositions=[]) == []
+
+
+def test_zero_planned_adaptations_halts_with_its_own_reason():
+    causes = pipeline._halt_causes(
+        integrity_halts=[], revert_failures=[], planned=0, surviving=0,
+        halt_dispositions=[])
+    assert causes == ["no adaptations survived: PLAN touched no blocks"]

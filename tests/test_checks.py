@@ -357,6 +357,49 @@ def test_profile_without_vocabulary_skips_the_ban():
 
 # ------------------------------------------------------ supporting machinery
 
+def test_every_check_is_classified_as_revertible_or_halting():
+    """§6 routes failures by check name; a new check must pick a side."""
+    assert checks.REVERTIBLE_CHECKS & checks.HALTING_CHECKS == frozenset()
+
+    emitted = {r.check for r in _run(_adapted()).results}
+    emitted |= {r.check for r in checks.check_reverted(
+        canonical=_canonical(), adapted=_adapted(), reverted_ids={"block-2"})}
+    unclassified = emitted - checks.ALL_CHECKS
+    assert unclassified == set(), unclassified
+
+
+def test_check_reverted_passes_when_the_reversion_took():
+    adapted = _adapted()
+    restored = _replace(adapted, 2, copy.deepcopy(CANONICAL_CONTENT[2]))
+    results = checks.check_reverted(canonical=_canonical(), adapted=restored,
+                                    reverted_ids={"block-2"})
+
+    assert [r.passed for r in results] == [True]
+    assert results[0].check == "revert_integrity"
+
+
+def test_check_reverted_catches_a_reversion_that_did_not_take():
+    # still carrying the adapted text despite being marked reverted
+    results = checks.check_reverted(canonical=_canonical(), adapted=_adapted(),
+                                    reverted_ids={"block-2"})
+
+    assert [r.passed for r in results] == [False]
+    assert "did not take" in results[0].detail
+
+
+def test_check_reverted_ignores_blocks_that_were_not_reverted():
+    assert checks.check_reverted(canonical=_canonical(), adapted=_adapted(),
+                                 reverted_ids=set()) == []
+
+
+def test_check_reverted_catches_a_missing_block():
+    short = [b for b in _adapted() if b.position != 2]
+    results = checks.check_reverted(canonical=_canonical(), adapted=short,
+                                    reverted_ids={"block-2"})
+    assert [r.passed for r in results] == [False]
+    assert "absent" in results[0].detail
+
+
 def test_canonical_form_ignores_key_order_but_not_values():
     assert (checks.canonical_form({"a": 1, "b": 2})
             == checks.canonical_form({"b": 2, "a": 1}))

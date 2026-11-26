@@ -371,21 +371,107 @@ def test_revisions_record_the_machine_disposition(run):
 
 # ------------------------------------------------------------- the halt paths
 
-def test_a_blocker_from_one_verifier_halts_the_version(run):
+def test_a_blocked_block_is_reverted_and_the_version_still_publishes(run):
+    """§6 per-block fallback: one bad adaptation costs one adaptation."""
+    plan = {"lessons": [{"lesson_id": LESSON_ID, "touch_list": [
+        {"block_position": 2, "reason": "r", "adaptation_instruction": "i"},
+        {"block_position": 4, "reason": "r", "adaptation_instruction": "i"}]}]}
+    adapted_c4 = json.loads(json.dumps(
+        next(b["content"] for b in CANONICAL_BLOCKS if b["position"] == 4)))
+    adapted_c4["question"] = ("A direct report's summary cites a variance "
+                              "figure you do not recognize.")
+
     models = Models(
-        PLAN_TOUCHING_2_AND_4, REWRITE_C2_ONLY_C4_UNCHANGED,
+        plan,
+        {"blocks": [
+            {"block_id": "c2", "unchanged": False, "content": ADAPTED_C2},
+            {"block_id": "c4", "unchanged": False, "content": adapted_c4}]},
         [{"findings": []},                      # verify_a: clean
          {"findings": [{"block_id": "c2", "issue": "fact_drift",
                         "severity": "blocker",
                         "detail": "introduced a sign-off claim not in the canonical"}]}],
+        # the disposition stage is never consulted about c2
+        {"dispositions": [{"block_id": "c4", "decision": "accept",
+                           "reason": "names this role's artifact"}]})
+    fake = run(models)
+
+    assert fake.version_status[TARGET_VERSION]["status"] == "published"
+    assert fake.job["status"] == "done"
+    # the blocked block is canonical again, verified from storage
+    assert fake.target_content(2) == next(
+        b["content"] for b in CANONICAL_BLOCKS if b["position"] == 2)
+    # the clean adaptation survived
+    assert fake.target_content(4)["question"].startswith("A direct report's")
+
+    adaptations = fake.job["evidence"]["adaptations"]
+    assert adaptations == {
+        "planned": 2, "surviving": 1, "reverted": 1,
+        "reverted_blocks": [{
+            "block_id": "c2", "reverted_by": "fallback",
+            "causes": ["verify_b/fact_drift: introduced a sign-off claim "
+                       "not in the canonical"]}]}
+    assert fake.job["evidence"]["checks"]["by_check"]["revert_integrity"] == \
+        {"pass": 1, "fail": 0}
+
+    reverted = next(r for r in fake.revisions if r["block_id"] == "c2")
+    assert reverted["review_status"] == "auto_reverted"
+    assert reverted["disposition_reason"].startswith("reverted by the per-block fallback")
+
+
+def test_the_disposition_stage_is_not_asked_about_a_blocked_block(run):
+    plan = {"lessons": [{"lesson_id": LESSON_ID, "touch_list": [
+        {"block_position": 2, "reason": "r", "adaptation_instruction": "i"}]}]}
+    models = Models(
+        plan,
+        {"blocks": [{"block_id": "c2", "unchanged": False, "content": ADAPTED_C2}]},
+        [{"findings": [{"block_id": "c2", "issue": "fact_drift",
+                        "severity": "blocker", "detail": "drifted"}]},
+         {"findings": []}],
+        {"dispositions": []})
+    fake = run(models)
+
+    # every planned adaptation was reverted, so nothing survived
+    assert models.stage(prompts.DISPOSITION_SYSTEM) == []
+    assert fake.job["status"] == "halted"
+    assert "no adaptations survived" in fake.job["error"]
+
+
+def test_a_failed_check_on_a_touched_block_reverts_rather_than_halting(run):
+    sabotaged = json.loads(json.dumps(
+        next(b["content"] for b in CANONICAL_BLOCKS if b["position"] == 4)))
+    sabotaged["options"][0]["correct"] = False
+    sabotaged["options"][1]["correct"] = True
+
+    models = Models(
+        PLAN_TOUCHING_2_AND_4,
+        {"blocks": [
+            {"block_id": "c2", "unchanged": False, "content": ADAPTED_C2},
+            {"block_id": "c4", "unchanged": False, "content": sabotaged}]},
+        [{"findings": []}, {"findings": []}],
+        {"dispositions": [{"block_id": "c2", "decision": "accept",
+                           "reason": "earns it"}]})
+    fake = run(models)
+
+    assert fake.version_status[TARGET_VERSION]["status"] == "published"
+    assert fake.target_content(4) == next(
+        b["content"] for b in CANONICAL_BLOCKS if b["position"] == 4)
+    assert fake.job["evidence"]["adaptations"]["surviving"] == 1
+    causes = fake.job["evidence"]["adaptations"]["reverted_blocks"][0]["causes"]
+    assert any("answer_key_integrity" in c for c in causes)
+
+
+def test_a_blocker_on_an_untouched_block_is_recorded_not_acted_on(run):
+    models = Models(
+        PLAN_TOUCHING_2_AND_4, REWRITE_C2_ONLY_C4_UNCHANGED,
+        [{"findings": [{"block_id": "nonexistent-block", "issue": "fact_drift",
+                        "severity": "blocker", "detail": "about nothing"}]},
+         {"findings": []}],
         ACCEPT_BOTH)
     fake = run(models)
 
-    assert fake.version_status[TARGET_VERSION]["status"] == "halted"
-    assert fake.job["status"] == "halted"
-    assert "blocker finding" in fake.job["error"]
-    assert "verify_b/fact_drift" in fake.job["error"]
-    assert fake.job["evidence"]["findings"]["blockers"] == 1
+    assert fake.version_status[TARGET_VERSION]["status"] == "published"
+    assert len(fake.job["evidence"]["unattributed_blockers"]) == 1
+    assert "was not touched" in fake.job["evidence"]["unattributed_blockers"][0]
 
 
 def test_a_halt_disposition_halts_the_version(run):
@@ -405,7 +491,7 @@ def test_a_halt_disposition_halts_the_version(run):
         b["content"] for b in CANONICAL_BLOCKS if b["position"] == 2)
 
 
-def test_a_rewrite_that_breaks_the_answer_key_halts_on_the_check(run):
+def test_a_deterministic_failure_is_attached_to_the_reverted_revision(run):
     sabotaged = json.loads(json.dumps(
         next(b["content"] for b in CANONICAL_BLOCKS if b["position"] == 4)))
     sabotaged["options"][0]["correct"] = False
@@ -418,10 +504,11 @@ def test_a_rewrite_that_breaks_the_answer_key_halts_on_the_check(run):
         ACCEPT_BOTH)
     fake = run(models)
 
+    # c4 reverted on the check; c2 had no rewrite entry, so nothing survived
     assert fake.version_status[TARGET_VERSION]["status"] == "halted"
-    assert "answer_key_integrity" in fake.job["error"]
-    assert fake.job["evidence"]["checks"]["failed"] >= 1
-    # the deterministic failure is attached to the block's revision too
+    assert "no adaptations survived" in fake.job["error"]
+    assert fake.target_content(4) == next(
+        b["content"] for b in CANONICAL_BLOCKS if b["position"] == 4)
     c4 = next(r for r in fake.revisions if r["block_id"] == "c4")
     assert any(n["source"] == "checks" for n in c4["verifier_notes"])
 
@@ -443,25 +530,39 @@ def test_plan_selecting_the_locked_block_halts_without_rewriting_it(run):
 
 # --------------------------------------------------------- reversion behavior
 
-def test_a_reverted_block_is_written_back_to_canonical(run):
+def test_a_stage_reverted_block_is_written_back_to_canonical(run):
+    adapted_c4 = json.loads(json.dumps(
+        next(b["content"] for b in CANONICAL_BLOCKS if b["position"] == 4)))
+    adapted_c4["question"] = ("A direct report's summary cites a variance "
+                              "figure you do not recognize.")
     models = Models(
-        PLAN_TOUCHING_2_AND_4, REWRITE_C2_ONLY_C4_UNCHANGED,
+        PLAN_TOUCHING_2_AND_4,
+        {"blocks": [
+            {"block_id": "c2", "unchanged": False, "content": ADAPTED_C2},
+            {"block_id": "c4", "unchanged": False, "content": adapted_c4}]},
         [{"findings": [{"block_id": "c2", "issue": "unwarranted_change",
                         "severity": "advisory", "detail": "wording only"}]},
          {"findings": []}],
         {"dispositions": [
             {"block_id": "c2", "decision": "revert_to_canonical",
              "reason": "near-zero semantic delta"},
-            {"block_id": "c4", "decision": "accept", "reason": "unchanged"}]})
+            {"block_id": "c4", "decision": "accept",
+             "reason": "names this role's artifact"}]})
     fake = run(models)
 
-    # advisory findings do not halt; the reversion is what ships
+    # advisory findings do not revert on their own; the stage's call does
     assert fake.version_status[TARGET_VERSION]["status"] == "published"
     assert fake.target_content(2) == next(
         b["content"] for b in CANONICAL_BLOCKS if b["position"] == 2)
     c2 = next(r for r in fake.revisions if r["block_id"] == "c2")
     assert c2["review_status"] == "auto_reverted"
-    assert fake.job["evidence"]["dispositions"]["reverted"] == 1
+    summary = fake.job["evidence"]["dispositions"]
+    assert (summary["reverted"], summary["reverted_by_stage"],
+            summary["reverted_by_fallback"]) == (1, 1, 0)
+    assert fake.job["evidence"]["adaptations"] == {
+        "planned": 2, "surviving": 1, "reverted": 1,
+        "reverted_blocks": [{"block_id": "c2", "reverted_by": "disposition",
+                             "causes": ["near-zero semantic delta"]}]}
 
 
 def test_a_dropped_rewrite_entry_leaves_the_canonical_in_place(run):
@@ -469,20 +570,23 @@ def test_a_dropped_rewrite_entry_leaves_the_canonical_in_place(run):
                     [{"findings": []}, {"findings": []}], {"dispositions": []})
     fake = run(models)
 
-    assert fake.version_status[TARGET_VERSION]["status"] == "published"
     assert fake.target_content(2) == next(
         b["content"] for b in CANONICAL_BLOCKS if b["position"] == 2)
     assert fake.job["evidence"]["dispositions"]["unchanged_by_rewrite"] == 2
     assert models.stage(prompts.DISPOSITION_SYSTEM) == []   # nothing to judge
+    # nothing was adapted, so there is no audience version to publish
+    assert fake.version_status[TARGET_VERSION]["status"] == "halted"
+    assert "no adaptations survived" in fake.job["error"]
 
 
-def test_an_empty_touch_list_publishes_a_verbatim_copy(run):
+def test_an_empty_touch_list_halts_under_the_zero_survivor_rule(run):
     plan = {"lessons": [{"lesson_id": LESSON_ID, "touch_list": []}]}
     models = Models(plan, {"blocks": []}, [], {"dispositions": []})
     fake = run(models)
 
     assert fake.job["evidence"]["touch_rate"]["touched"] == 0
-    assert fake.version_status[TARGET_VERSION]["status"] == "published"
+    assert fake.version_status[TARGET_VERSION]["status"] == "halted"
+    assert "PLAN touched no blocks" in fake.job["error"]
     assert models.stage(prompts.REWRITE_SYSTEM) == []
     assert models.stage(prompts.VERIFY_SYSTEM) == []
     assert fake.revisions == []

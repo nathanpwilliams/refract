@@ -211,10 +211,23 @@ def test_summary_counts_every_decision():
         dispo.Disposition("b1", dispo.ACCEPT, "earns it"),
         dispo.Disposition("b2", dispo.ACCEPT, "unchanged", unchanged_by_rewrite=True),
         dispo.Disposition("b3", dispo.REVERT, "churn"),
-        dispo.Disposition("b4", dispo.HALT, "canonical is wrong here"),
+        dispo.fallback_revert("b4", ["length_budget: 41 -> 58 words"]),
+        dispo.Disposition("b5", dispo.HALT, "canonical is wrong here"),
     ]
     assert dispo.summary(dispositions) == {
-        "accepted": 2, "reverted": 1, "halted": 1,
+        "accepted": 2, "reverted": 2, "halted": 1,
+        "reverted_by_fallback": 1, "reverted_by_stage": 1,
         "unchanged_by_rewrite": 1,
-        "halt_reasons": [{"block_id": "b4", "reason": "canonical is wrong here"}],
+        "halt_reasons": [{"block_id": "b5", "reason": "canonical is wrong here"}],
     }
+
+
+def test_a_fallback_reversion_names_its_causes_and_its_source():
+    d = dispo.fallback_revert("b1", ["length_budget: 41 -> 58 words",
+                                     "verify_b/fact_drift: softened the claim"])
+    assert d.decision == dispo.REVERT
+    assert d.decided_by == dispo.FALLBACK
+    assert d.review_status == "auto_reverted"
+    assert "length_budget" in d.reason and "verify_b/fact_drift" in d.reason
+    # the stage's own reversions stay distinguishable from the fallback's
+    assert dispo.Disposition("b2", dispo.REVERT, "churn").decided_by == dispo.STAGE

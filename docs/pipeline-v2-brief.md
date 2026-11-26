@@ -91,14 +91,46 @@ functional for the future client_sme tier — do not remove it.
   contents}. This is the compliance file's data layer; PDF rendering
   is a later task.
 
-### 6. Publish semantics
-- All checks pass + no blocker findings + no halt dispositions →
-  version auto-publishes (status 'published', published_at now).
+### 6. Publish semantics — per-block fallback
+**Revised 2026-11-26, after three live runs.** The original rule was
+all-or-nothing: any failed check or blocker finding halted the whole
+version. In practice that discarded eight or nine warranted adaptations
+over one defective block, and made a green run the product of ~30
+independent model compliances. The warranty never required that; it
+requires that nothing defective ships.
+
+- A TOUCHED block that fails any deterministic check, or draws a
+  'blocker' from either verifier, is **reverted to canonical in code** —
+  not by the disposition stage, which is never consulted about it. The
+  version is then read back from storage and every reverted block must be
+  byte-identical to its canonical.
+- The version **publishes with the surviving adaptations** (status
+  'published', published_at now).
+- **Halt only when a reversion cannot cure the defect:**
+  * an untouched or locked block fails integrity (verbatim_integrity,
+    locked_integrity);
+  * structure_integrity fails — the version's shape is wrong, not one
+    block's prose;
+  * a reverted block is not byte-identical to canonical, i.e. the
+    reversion did not take;
+  * zero adaptations survive;
+  * a halt disposition — that decision is defined in §4 as "something is
+    wrong that reversion doesn't fix", making it the one model verdict
+    the fallback cannot absorb.
 - Otherwise → status 'halted' (add to version status constraint),
   job.error summarizing causes. Halted versions are diagnostic
   artifacts — fixing means changing canonical/profile/prompts and
   re-running, not editing the version. No notification queue, no
   human review path.
+- Evidence records every reverted block with its cause and which stage
+  reverted it, plus the counts of planned, surviving, and reverted
+  adaptations. A published version therefore states exactly how much of
+  itself is adapted, and what was rejected on the way.
+
+Note for §3: `length_violation` was removed from VERIFY's issue list in
+the same revision. Length is computed with perfect recall by
+`length_budget`; asking two models to estimate word counts produced
+blocker findings that contradicted the computed bound.
 
 ## Acceptance criteria
 1. Live run: flagship canonical → managers profile → touch_list is a
