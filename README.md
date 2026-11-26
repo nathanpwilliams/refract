@@ -2,6 +2,10 @@
 
 **One course, written once. Many audiences, each one earned.**
 
+**[Live demo →](https://nathanpwilliams.github.io/refract/)** — a published
+course version in the browser, and the run report for the pipeline job that
+produced it. No sign-in, nothing to install.
+
 Corporate training has a structural problem: the course that works for a
 frontline manager is not the course that works for an engineer or a
 salesperson, but nobody can afford to author four of them. So everyone
