@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run report — AI at Work for managers</title>
+<meta name="description" content="Refract — an audience-adaptive course platform. Static demo of a published course version and the pipeline run that produced it.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site">
+  <div class="inner">
+    <span class="brand">Refract</span>
+    <nav aria-label="Demo pages">
+        <a href="index.html">Overview</a>
+        <a href="course/index.html">Course demo</a>
+        <a href="report.html" aria-current="page">Run report</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap">
+<main id="main">
+<p class="eyebrow">Run report</p>
+<h1>AI at Work &mdash; refracted for managers</h1>
+<p class="lede">One adaptation job, start to finish, built entirely from what
+the pipeline recorded in the database: job <code>4d12de16</code>,
+published version <code>8da81e12</code>
+(<q>managers r4</q>), finished 2026-11-26 20:06 UTC.
+No human reviewed any block.</p>
+
+<h2>Summary</h2>
+<ul class="figures"><li><span class="n">38</span><span class="k">blocks in the canonical course</span></li><li><span class="n">10 / 38</span><span class="k">blocks selected for adaptation (26.3% touch rate)</span></li><li><span class="n">92 / 93</span><span class="k">deterministic checks passed</span></li><li><span class="n">10 / 9 / 1</span><span class="k">adaptations planned / published / reverted</span></li><li><span class="n">0</span><span class="k">verifier findings (0 blocking)</span></li><li><span class="n">0</span><span class="k">human review steps</span></li></ul>
+<p>Dispositions: 9 accepted,
+1 reverted
+(1 by the per-block fallback,
+0 by the disposition stage),
+0 halting. The canonical the run was derived from is
+fixed by a SHA-256 over its ordered block contents:
+<code>644b1da31d3c4d0e8d9d45c8a6414798…</code></p>
+
+<h2>What the planner chose to touch</h2>
+<p>PLAN sees the whole course — every block, its type, whether it is locked, and
+a preview of its prose — plus the audience profile, and returns a touch list
+with a reason for each block. Selecting a minority is the point: an untouched
+block is canonical by construction.</p>
+<div class="scroll"><table>
+<caption>Every block PLAN selected, with the reason it gave. Blocks not listed
+here were copied from the canonical with no model contact at all.</caption>
+<thead><tr><th scope="col">Lesson</th><th scope="col" class="num">Block</th>
+<th scope="col">Type</th><th scope="col">PLAN's reason for touching it</th>
+<th scope="col">Outcome</th></tr></thead>
+<tbody><tr><td>A tool, not a colleague</td><td class="num">6</td><td><code>text</code></td><td>The example is a 40-page report summary — generic professional context. The profile names &#x27;summarizing a month of status reports into one leadership update&#x27; as a concrete example domain, which is a direct substitution that grounds the fit/cost framing in this audience&#x27;s actual artifact.</td><td><span class="tag tag-kept">Published</span></td></tr><tr><td>A tool, not a colleague</td><td class="num">7</td><td><code>text</code></td><td>The example is a &#x27;client status update from bullet points&#x27; — close but not the manager&#x27;s primary upward-communication artifact. The profile names &#x27;weekly status report to a director&#x27; and &#x27;escalation emails to leadership&#x27; as canonical artifacts, and the redline emphasis is on managers sending AI-polished summaries upward without verifying contents.</td><td><span class="tag tag-kept">Published</span></td></tr><tr><td>A tool, not a colleague</td><td class="num">8</td><td><code>text</code></td><td>The example is a &#x27;fee schedule&#x27; — a finance/billing artifact. The profile names &#x27;budget variance summaries&#x27; and &#x27;vendor or contractor quotes to compare&#x27; as the manager&#x27;s numerical artifacts, and the failure mode is approving numbers that flow upward unchecked. Substituting one of these makes the &#x27;poor fit&#x27; warning land on the actual risk this audience faces.</td><td><span class="tag tag-kept">Published</span></td></tr><tr><td>A tool, not a colleague</td><td class="num">11</td><td><code>text</code></td><td>The block describes failures that &#x27;reach a manager&#x27;s desk&#x27; but frames the manager as a passive recipient. For this audience, the redline failure mode is that they are the ones signing off on AI-assisted work from direct reports — inherited hallucinations flowing upward under the manager&#x27;s name. The framing should reflect that the manager is accountable for what passes through, not just a bystander.</td><td><span class="tag tag-kept">Published</span></td></tr><tr><td>How language models actually work</td><td class="num">6</td><td><code>text</code></td><td>The block says the model has never seen &#x27;your organization&#x27;s documents, your project, your client.&#x27; For managers, the concrete version of this is that the model has never seen a direct report&#x27;s draft, a project plan, or a vendor quote unless the manager pasted it in — and a direct report&#x27;s AI-assisted work may contain hallucinations the manager inherits. Grounding the abstract statement in the manager&#x27;s actual artifacts makes the mechanism lesson actionable.</td><td><span class="tag tag-kept">Published</span></td></tr><tr><td>How language models actually work</td><td class="num">8</td><td><code>knowledge_check</code></td><td>This knowledge check tests whether the learner understands that the model has never seen their contract unless they provided it. The setting (a contract) is generic legal/procurement. The profile names &#x27;vendor or contractor quotes to compare&#x27; as a canonical artifact. The correct answer&#x27;s reason — &#x27;the model has never seen your contract unless you provided it&#x27; — transfers cleanly to a contractor quote, because the same fact holds: the model has never seen that quote unless the manager pasted it in. The decision under test does not change.</td><td><span class="tag tag-kept">Published</span></td></tr><tr><td>What this means for your work</td><td class="num">5</td><td><code>text</code></td><td>The &#x27;decide lane&#x27; block lists &#x27;who to hire, which vendor, whether to escalate&#x27; as examples of decisions that belong to a person. These are exactly the manager&#x27;s failure mode — delegating the actual call to AI. The examples are already close, but &#x27;who to hire&#x27; touches personnel decisions, which is also the redline about feeding personnel information into AI tools. The block should name the manager&#x27;s specific decision artifacts to make the failure mode concrete.</td><td><span class="tag tag-kept">Published</span></td></tr><tr><td>What this means for your work</td><td class="num">8</td><td><code>text</code></td><td>The &#x27;draft lane&#x27; example is &#x27;turning this morning&#x27;s messy meeting notes into clean minutes you&#x27;ll read before sending.&#x27; This is already a named artifact in the profile (&#x27;meeting notes to be turned into minutes and action items&#x27;) and is a strong fit. However, the example omits the manager-specific review obligation — that the minutes will carry owners and due dates the manager is accountable for. A small framing adjustment makes the review step concrete without changing the lane assignment.</td><td><span class="tag tag-kept">Published</span></td></tr><tr><td>What this means for your work</td><td class="num">9</td><td><code>text</code></td><td>The &#x27;decide lane&#x27; example is choosing between two vendor quotes — already a named artifact in the profile (&#x27;vendor or contractor quotes to compare&#x27;). The example is well-matched but ends with &#x27;you know things the quotes don&#x27;t.&#x27; For managers, the specific things they know are team capacity, prior vendor performance, and stakeholder constraints — naming these makes the &#x27;decide yourself&#x27; instruction concrete rather than abstract.</td><td><span class="tag tag-reverted">Reverted</span></td></tr><tr><td>What this means for your work</td><td class="num">12</td><td><code>scenario</code></td><td>This scenario tests the triage habit under time pressure. The current setting involves supplier pricing — a procurement context. The profile names &#x27;comparing two contractor quotes for a services engagement&#x27; and &#x27;reviewing a direct report&#x27;s AI-assisted cost estimate before it goes to the client&#x27; as example domains. The correct answer&#x27;s reason — the model has never seen these quotes or these suppliers&#x27; current terms — transfers cleanly to a contractor quote scenario. The decision under test (don&#x27;t ask AI for numbers it has never seen; use the documents you have) does not change.</td><td><span class="tag tag-kept">Published</span></td></tr></tbody></table></div>
+
+<h2>Before and after, block by block</h2>
+<p>All 10 planned adaptations. The spectrum edge marks
+machine-adapted content. One block was reverted; it is labelled, and its cause
+is shown with it.</p>
+<figure class="diff">
+<figcaption>
+  <span class="where">A tool, not a colleague · block 6</span>
+  <span class="kind">text · 585dd800</span>
+  <span class="tag tag-kept">Published as adapted</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Replace the &#x27;40-page report&#x27; example with summarizing a month of status reports into a single leadership update. Keep the same structure: name the task, label it &#x27;excellent fit,&#x27; and give the same reasoning — the source is in your hands, spot-checking takes minutes, and a miss costs a correction not money. Do not add words; substitute the scenario only.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <p>Summarizing a 40-page report into one page: <strong>excellent fit.</strong> The source is in your hands, so spot-checking the summary takes minutes — and a miss costs you an awkward moment, not money.</p>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <p>Summarizing a month of status reports into a single leadership update: <strong>excellent fit.</strong> The source is in your hands, so spot-checking the summary takes minutes — and a miss costs you a correction, not money.</p>
+  </div>
+</div>
+</figure><figure class="diff">
+<figcaption>
+  <span class="where">A tool, not a colleague · block 7</span>
+  <span class="kind">text · d8220523</span>
+  <span class="tag tag-kept">Published as adapted</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Replace &#x27;client status update from your bullet points&#x27; with a weekly status report to a director drafted from your own notes. Keep the &#x27;strong fit&#x27; label and the same reasoning: you supplied the facts, you read every word before it sends, AI saves the blank page and you keep the judgment. Do not add words; substitute the artifact only.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <p>Drafting a client status update from your bullet points: <strong>strong fit.</strong> You supplied the facts, and you will read every word before it sends. The AI saves you the blank page; you keep the judgment.</p>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <p>Drafting a weekly status report to a director from your own notes: <strong>strong fit.</strong> You supplied the facts, and you will read every word before it sends. The AI saves you the blank page; you keep the judgment.</p>
+  </div>
+</div>
+</figure><figure class="diff">
+<figcaption>
+  <span class="where">A tool, not a colleague · block 8</span>
+  <span class="kind">text · 28c298ee</span>
+  <span class="tag tag-kept">Published as adapted</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Replace &#x27;calculating a fee schedule&#x27; with calculating figures for a budget variance summary (or a contractor quote comparison). Keep the &#x27;poor fit&#x27; label and the same reasoning: a wrong number looks exactly like a right number, use a spreadsheet for the math, then let AI explain or document the formula. Do not add words; substitute the artifact only.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <p>Calculating a fee schedule: <strong>poor fit.</strong> A wrong number looks exactly like a right number until it costs money. Use a spreadsheet for the math — then, if it helps, let AI explain or document the formula. The pattern: AI drafts and explains; verified tools calculate.</p>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <p>Calculating figures for a budget variance summary or contractor quote comparison: <strong>poor fit.</strong> A wrong number looks exactly like a right number until it costs money. Use a spreadsheet for the math — then, if it helps, let AI explain or document the formula. The pattern: AI drafts and explains; verified tools calculate.</p>
+  </div>
+</div>
+</figure><figure class="diff">
+<figcaption>
+  <span class="where">A tool, not a colleague · block 11</span>
+  <span class="kind">text · 67e5c973</span>
+  <span class="tag tag-kept">Published as adapted</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Reframe the failures as ones the manager passes upward under their own name, not just ones that arrive at their desk. Keep the same three examples (confident summary of a document AI was never shown, calculation pasted into a deliverable, a regulation &#x27;fact&#x27; that sounded right). Add that the manager&#x27;s sign-off is what makes these consequential — &#x27;the AI drafted it&#x27; is not a defense. Do not change the examples or add new ones; shift the accountability framing only, within the existing word count.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <p>The failures that reach a manager's desk are rarely exotic. They are a confident summary of a document the AI was never shown. A calculation pasted straight into a deliverable. A "fact" about a regulation that sounded right. In every case the tool did what it always does — produced something plausible — and a person skipped the step where plausible gets checked. That step is yours, and it never transfers.</p>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <p>The failures that reach a director's inbox are rarely exotic — and they arrive under your name. A confident summary of a document the AI was never shown. A calculation pasted straight into a deliverable. A "fact" about a regulation that sounded right. In every case the tool did what it always does — produced something plausible — and the sign-off skipped the step where plausible gets checked. Your sign-off is what makes these consequential. "The AI drafted it" is not a defense. That verification step is yours, and it never transfers.</p>
+  </div>
+</div>
+</figure><figure class="diff">
+<figcaption>
+  <span class="where">How language models actually work · block 6</span>
+  <span class="kind">text · 0edd6e48</span>
+  <span class="tag tag-kept">Published as adapted</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Replace the generic list (&#x27;your organization&#x27;s documents, your project, your client&#x27;) with examples from the manager&#x27;s artifact set: a direct report&#x27;s draft, a project schedule, a vendor quote, or a budget summary. Keep the same mechanism explanation — the model&#x27;s knowledge is a frozen snapshot; everything else must be in the prompt. Do not add words; substitute the artifact examples only.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <p>A model's general knowledge comes from training — a frozen snapshot of public text with a cutoff date. Everything else, it only knows if you put it in the prompt. It has never seen your organization's documents, your project, your client, or anything that happened after its training ended — unless you show it.</p>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <p>A model's general knowledge comes from training — a frozen snapshot of public text with a cutoff date. Everything else, it only knows if you put it in the prompt. It has never seen a direct report's draft, your project schedule, a vendor quote, or your budget variance summary — unless you show it.</p>
+  </div>
+</div>
+</figure><figure class="diff">
+<figcaption>
+  <span class="where">How language models actually work · block 8</span>
+  <span class="kind">knowledge_check · 3c731cab</span>
+  <span class="tag tag-kept">Published as adapted</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Move the setting from a generic contract to a contractor services quote the manager is reviewing. The question should ask what the model is doing when it describes what the quote &#x27;probably says.&#x27; The correct answer and its reason remain identical: the model has never seen this quote unless you provided it; it is predicting what a quote like this probably says, which may or may not match the actual document. Do not change the answer key, the decision being tested, or the feedback text&#x27;s core reasoning.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <p>You ask an AI assistant a question about a contract without providing the contract, and receive a detailed, confident answer. What is actually happening?</p><ul class="opts"><li><span class="mark">Incorrect</span> — The model found the contract in its database and is quoting it<br><span class="fb">There is no database lookup — and the model has never seen your contract unless you provided it.</span></li><li><span class="mark">Correct</span> — The model is predicting what a contract like yours probably says — which may or may not match what yours actually says<br><span class="fb">Exactly. Without the source, you&#x27;re getting plausible text, not your contract. The fix is simple: paste the document.</span></li><li><span class="mark">Incorrect</span> — The confident tone means the answer is probably reliable<br><span class="fb">Fluency is style, not evidence — the model sounds the same when it&#x27;s wrong.</span></li></ul>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <p>You ask an AI assistant about a contractor services quote without providing the document, and receive a detailed, confident answer about what the quote covers. What is actually happening?</p><ul class="opts"><li><span class="mark">Incorrect</span> — The model found the quote in its database and is describing it accurately<br><span class="fb">There is no database lookup — and the model has never seen this quote unless you provided it.</span></li><li><span class="mark">Correct</span> — The model is predicting what a quote like yours probably says — which may or may not match what yours actually says<br><span class="fb">Exactly. Without the source, you&#x27;re getting plausible text, not your quote. The fix is simple: paste the document.</span></li><li><span class="mark">Incorrect</span> — The confident tone means the answer is probably reliable<br><span class="fb">Fluency is style, not evidence — the model sounds the same when it&#x27;s wrong.</span></li></ul>
+  </div>
+</div>
+</figure><figure class="diff">
+<figcaption>
+  <span class="where">What this means for your work · block 5</span>
+  <span class="kind">text · 4fdeae3f</span>
+  <span class="tag tag-kept">Published as adapted</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Keep the &#x27;decide lane&#x27; definition and the rule that the call belongs to a person. Replace the generic examples with ones from the manager&#x27;s context: which contractor quote to accept, whether to escalate a schedule slip to leadership, how to prioritize competing deliverables. Remove &#x27;who to hire&#x27; specifically, as it edges into personnel territory that the redline block will address separately. Do not change the lane definition or the principle that AI informs but does not decide.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <p><strong>The decide lane — AI informs, you decide.</strong> Comparing options, structuring trade-offs, briefing you before a judgment call. AI can lay out the landscape, but the call itself — who to hire, which vendor, whether to escalate — belongs to a person with accountability and context the model doesn't have. Let it brief you; never let it vote.</p>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <p><strong>The decide lane — AI informs, you decide.</strong> Comparing options, structuring trade-offs, briefing you before a judgment call. AI can lay out the landscape, but the call itself — which contractor quote to accept, whether to escalate a schedule slip, how to prioritize competing deliverables — belongs to a person with accountability and context the model doesn't have. Let it brief you; never let it vote.</p>
+  </div>
+</div>
+</figure><figure class="diff">
+<figcaption>
+  <span class="where">What this means for your work · block 8</span>
+  <span class="kind">text · bc057b4c</span>
+  <span class="tag tag-kept">Published as adapted</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Keep the task (meeting notes into minutes), the &#x27;draft lane&#x27; label, and the reasoning. Add that the review step matters because the minutes will carry action items and owners — a wrong assignment is a management problem, not just a typo. Do not add words beyond substituting the consequence phrase; replace &#x27;a miss costs a correction, not a consequence&#x27; with a phrase naming the action-item/owner risk.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <p>Turning this morning's messy meeting notes into clean minutes you'll read before sending: <strong>draft lane.</strong> You hold the source, you review the output, and a miss costs a correction, not a consequence.</p>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <p>Turning this morning's messy meeting notes into clean minutes you'll read before sending: <strong>draft lane.</strong> You hold the source, you review the output, and a wrong action item or misassigned owner is a management problem you'll own.</p>
+  </div>
+</div>
+</figure><figure class="diff">
+<figcaption>
+  <span class="where">What this means for your work · block 9</span>
+  <span class="kind">text · 60c18e82</span>
+  <span class="tag tag-reverted">Reverted to canonical</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Keep the task (comparing two vendor quotes), the &#x27;decide lane&#x27; label, and the instruction to close the laptop and decide. Replace the generic &#x27;you know things the quotes don&#x27;t&#x27; with specific examples from the manager&#x27;s context: prior vendor performance, your team&#x27;s capacity to manage the engagement, or constraints leadership hasn&#x27;t put in writing. Do not change the lane assignment or the principle.</div><div class="cause"><b>Why this block was reverted</b> (fallback): <ul><li><code>length_budget: 41 -&gt; 58 words (+41%), outside allowed 29-53</code></li></ul>The published course therefore carries the canonical text for this block, re-read from storage and confirmed identical.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <p>Choosing between two vendor quotes: <strong>decide lane.</strong> Paste both quotes and ask for a side-by-side comparison of scope, price, and exclusions — that part AI does brilliantly. Then close the laptop and decide, because you know things the quotes don't say.</p>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <p>Choosing between two vendor quotes: <strong>decide lane.</strong> Paste both quotes and ask for a side-by-side comparison of scope, price, and exclusions — that part AI does brilliantly. Then close the laptop and decide, because you know things the quotes don't say: prior vendor performance, your team's capacity to manage the engagement, and constraints leadership hasn't put in writing.</p>
+  </div>
+</div>
+</figure><figure class="diff">
+<figcaption>
+  <span class="where">What this means for your work · block 12</span>
+  <span class="kind">scenario · acb1605f</span>
+  <span class="tag tag-kept">Published as adapted</span>
+</figcaption>
+<div class="why"><b>Adaptation instruction:</b> Move the setting from generic supplier pricing to a manager comparing two contractor quotes for a services engagement under time pressure. The tempting wrong option should be asking AI what contractors like these typically charge. The correct path should be pasting both quotes into the tool and asking for a structured comparison of scope, price, and exclusions — then deciding. The decision under test does not change: the model has never seen these quotes or current market terms; use the documents you have, not AI&#x27;s probabilistic pricing knowledge. Do not change the answer key or the reasoning behind the correct option.</div>
+<div class="panes">
+  <div class="pane">
+    <h4>Canonical</h4>
+    <div class="situation"><p>It's late afternoon. Your director needs a one-page comparison of the three supplier quotes you've collected, in time for tomorrow morning's decision meeting. The quotes are sitting in a folder. You open your AI assistant. What's your move?</p></div><ul class="opts"><li><span class="mark">Poor</span> — Ask the AI what these suppliers typically charge — it&#x27;s seen a lot of pricing data, and you&#x27;re short on time<br><span class="fb">The model has never seen these quotes or these suppliers&#x27; current terms. You&#x27;ll get plausible market-shaped numbers presented confidently — and tomorrow&#x27;s decision gets made on fiction. Time pressure is exactly when this shortcut is most tempting and most expensive.</span></li><li><span class="mark">Best</span> — Paste all three quotes and ask for a one-page comparison table — scope, price, exclusions, open questions — then review it against the quotes and add your recommendation yourself<br><span class="fb">Draft lane for the table, decide lane respected for the call. Twenty minutes of work, grounded in the actual documents, ending with the one thing only you can add: judgment.</span></li><li><span class="mark">Poor</span> — Paste all three quotes and ask the AI which supplier to choose<br><span class="fb">Grounded in the real documents — but you&#x27;ve handed over the decision itself, and making decisions is what professionals are paid to do. The model doesn&#x27;t know your history with these suppliers, your schedule risk, or what your director cares about this quarter — and when the choice is questioned, &quot;the AI picked it&quot; is not an answer anyone accepts accountability for. Take its comparison; the recommendation is your job.</span></li></ul>
+  </div>
+  <div class="pane adapted adapted-edge">
+    <h4>Adapted for managers</h4>
+    <div class="situation"><p>It's late afternoon. Your director needs a one-page comparison of the three contractor quotes you've collected, in time for tomorrow morning's decision meeting. The quotes are sitting in a folder. You open your AI assistant. What's your move?</p></div><ul class="opts"><li><span class="mark">Poor</span> — Ask the AI what contractors like these typically charge — it&#x27;s seen a lot of pricing data, and you&#x27;re short on time<br><span class="fb">The model has never seen these quotes or these contractors&#x27; current terms. You&#x27;ll get plausible market-shaped numbers presented confidently — and tomorrow&#x27;s decision gets made on fiction. Time pressure is exactly when this shortcut is most tempting and most expensive.</span></li><li><span class="mark">Best</span> — Paste all three quotes and ask for a one-page comparison table — scope, price, exclusions, open questions — then review it against the quotes and add your recommendation yourself<br><span class="fb">Draft lane for the table, decide lane respected for the call. Twenty minutes of work, grounded in the actual documents, ending with the one thing only you can add: judgment.</span></li><li><span class="mark">Poor</span> — Paste all three quotes and ask the AI which contractor to choose<br><span class="fb">Grounded in the real documents — but you&#x27;ve handed over the decision itself, and making decisions is what managers are paid to do. The model doesn&#x27;t know your history with these contractors, your team&#x27;s capacity to manage the engagement, or what your director cares about this quarter — and when the choice is questioned, &quot;the AI picked it&quot; is not a defense anyone accepts. Take its comparison; the recommendation is your job.</span></li></ul>
+  </div>
+</div>
+</figure>
+
+<h2>Deterministic checks</h2>
+<div class="scroll"><table>
+<caption>Computed, not judged: these run in ordinary code over the version read
+back from the database. For what they cover they have perfect recall.</caption>
+<thead><tr><th scope="col">Check</th><th scope="col" class="num">Run</th>
+<th scope="col" class="num">Passed</th><th scope="col">Result</th>
+<th scope="col">What it proves</th></tr></thead>
+<tbody><tr><td><code>answer_key_integrity</code></td><td class="num">4</td><td class="num">4</td><td><span class="tag tag-pass">All passed</span></td><td>Option ids, option counts, correct flags and quality ratings are unchanged. <em>On failure: reverts the block.</em></td></tr><tr><td><code>length_budget</code></td><td class="num">10</td><td class="num">9</td><td><span class="tag tag-fail">1 failed</span></td><td>Each adapted block is within a computed ±30% word bound. <em>On failure: reverts the block.</em></td></tr><tr><td><code>locked_integrity</code></td><td class="num">1</td><td class="num">1</td><td><span class="tag tag-pass">All passed</span></td><td>Blocks marked adaptable=false are identical, and PLAN did not select one. <em>On failure: halts the run.</em></td></tr><tr><td><code>revert_integrity</code></td><td class="num">1</td><td class="num">1</td><td><span class="tag tag-pass">All passed</span></td><td>Every reverted block was read back and is identical to the canonical. <em>On failure: halts the run.</em></td></tr><tr><td><code>structure_integrity</code></td><td class="num">39</td><td class="num">39</td><td><span class="tag tag-pass">All passed</span></td><td>Block types, content keys, and block order are unchanged. <em>On failure: halts the run.</em></td></tr><tr><td><code>verbatim_integrity</code></td><td class="num">28</td><td class="num">28</td><td><span class="tag tag-pass">All passed</span></td><td>Untouched blocks are identical to the canonical. <em>On failure: halts the run.</em></td></tr><tr><td><code>vocabulary_ban</code></td><td class="num">10</td><td class="num">10</td><td><span class="tag tag-pass">All passed</span></td><td>The audience profile&#x27;s avoid-list terms are absent from rewritten text. <em>On failure: reverts the block.</em></td></tr></tbody></table></div>
+<p>The one failure, in full:</p><ul><li><code>length_budget</code> on block 60c18e82: 41 -&gt; 58 words (+41%), outside allowed 29-53</li></ul>
+
+<h2>Verifier findings</h2>
+<p>VERIFY ran twice, on two different models at temperature 0, and a blocking
+finding from either one reverts that block. This run drew
+<b>0 findings</b>. Length is deliberately not theirs to
+judge — <code>length_budget</code> computes it exactly — after an earlier run
+in which both verifiers raised blocking length findings on a block the
+computed bound had passed.</p>
+
+<h2>Models and prompts</h2>
+<div class="scroll"><table>
+<caption>Recorded per run, so a published version can be traced to exactly what
+produced it. Two Claude models are only partially decorrelated; a second-vendor
+verifier is the roadmap hardening, and the verifier interface is
+provider-agnostic for that reason.</caption>
+<thead><tr><th scope="col">Stage</th><th scope="col">Model</th></tr></thead>
+<tbody><tr><td>PLAN — selects the blocks to touch</td><td><code>claude-sonnet-4-6</code></td></tr><tr><td>REWRITE — adapts the touched blocks</td><td><code>claude-sonnet-4-6</code></td></tr><tr><td>VERIFY A — first independent verifier</td><td><code>anthropic:claude-sonnet-4-6</code></td></tr><tr><td>VERIFY B — second independent verifier</td><td><code>anthropic:claude-haiku-4-5</code></td></tr><tr><td>DISPOSITION — judges the surviving adaptations</td><td><code>claude-sonnet-4-6</code></td></tr></tbody></table></div>
+<p>Prompt versions: disposition&nbsp;<code>disposition-v2.0</code>, plan&nbsp;<code>plan-v2.2</code>, rewrite&nbsp;<code>rewrite-v2.1</code>, verify&nbsp;<code>verify-v2.1</code>.</p>
+
+<h2>The three runs that halted first</h2>
+<p>This was the fourth attempt. The first three halted rather than publishing,
+and the fixes were changes to the prompts and to the publish rule — not to the
+checks:</p>
+<ol><li><b>Run 1</b> — 9 blocks touched, 5 check failure(s), 2 blocking finding(s): <ul><li>deterministic checks failed: length_budget x5 (first: 35 -&gt; 47 words (+34%), outside allowed 25-45)</li><li>2 blocker finding(s) from verification (first: verify_b/answer_key_violation on block 170daf6f-dd80-4b63-8fdb-b3766d7b390c: The adapted question fundamentally changes the scenario context and decision point: original asks &#x27;should AI calculate the fee schedule&#x27; (clear poor fit), but adapted asks &#x27;wha…</li></ul></li><li><b>Run 2</b> — 9 blocks touched, 0 check failure(s), 1 blocking finding(s): <ul><li>1 blocker finding(s) from verification (first: verify_a/fact_drift on block 3c731cab-2211-49e4-a8f2-b4a3119f166d: The adaptation instruction specifies the scenario is a direct report who pasted the quote into the AI tool (i.e., the document WAS provided), but the adapted feedback for option A and th…</li></ul></li><li><b>Run 3</b> — 10 blocks touched, 1 check failure(s), 3 blocking finding(s): <ul><li>deterministic checks failed: length_budget x1 (first: 41 -&gt; 58 words (+41%), outside allowed 29-53)</li><li>3 blocker finding(s) from verification (first: verify_b/fact_drift on block 585dd800-6a00-46b2-8689-eccd4c5e5110: The adapted version changes &#x27;a miss costs you an awkward moment, not money&#x27; to &#x27;a miss costs you a correction, not money,&#x27; which alters the reasoning about consequence severity and no lo…</li></ul></li></ol>
+<p>The fourth run changed the rule itself: a defective block is now reverted to
+canonical on its own, and the version publishes with what survives. Halts are
+reserved for what reverting cannot cure — a block that should have been copied
+and wasn't, locked content that moved, a structural change, a reversion that
+did not take, or nothing surviving at all.</p>
+
+</main>
+</div>
+<footer class="site">
+  <div class="inner">
+    <p>Refract — source-available, all rights reserved. Copyright &copy; 2026
+       Nathan Williams. Published for review and evaluation; no licence to use
+       is granted. See
+       <a href="https://github.com/nathanpwilliams/refract/blob/main/LICENSE-NOTICE">LICENSE-NOTICE</a>.</p>
+    <p>Course content is a sample for demonstration.
+       <a href="https://github.com/nathanpwilliams/refract">Source repository</a>.</p>
+  </div>
+</footer>
+</body>
+</html>

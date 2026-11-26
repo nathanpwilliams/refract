@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refract — audience-adaptive course platform</title>
+<meta name="description" content="Refract — an audience-adaptive course platform. Static demo of a published course version and the pipeline run that produced it.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site">
+  <div class="inner">
+    <span class="brand">Refract</span>
+    <nav aria-label="Demo pages">
+        <a href="index.html" aria-current="page">Overview</a>
+        <a href="course/index.html">Course demo</a>
+        <a href="report.html">Run report</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap">
+<main id="main">
+<p class="eyebrow">Work in progress</p>
+<h1>Refract — one course, written once; many audiences, each one earned</h1>
+
+<p class="lede">Corporate training ships one generic course because nobody can
+afford to author four. Refract is an audience-adaptive course platform: an
+author writes one <em>canonical</em> course, and a pipeline refracts it into
+audience-specific versions — reshaping scenarios, worked examples and
+emphasis for a given role — while holding the things that must not drift
+byte-identical.</p>
+
+<p>Courses are structured content blocks in Postgres rather than documents,
+which is what makes per-block adaptation and per-block integrity proofs
+possible. Adaptation runs through a machine warranty instead of a human
+sign-off: blocks the planner does not select never reach a model at all, a
+deterministic check suite proves what it covers with perfect recall, two
+different models verify independently, and anything that fails is reverted to
+the canonical text in code. Published versions render in a web player and
+export as SCORM 1.2 packages for any corporate LMS.</p>
+
+<p>The two pages below are the real output of one run, built from what the
+database stored: 10 of 38 blocks were selected
+for adaptation, 9 of 10 adaptations
+survived the checks, and the version published with no human in the loop.</p>
+
+<div class="note">
+  <p><b>This is a work in progress, and the course content is a sample.</b> What
+  you can read here is Module&nbsp;1 — three lessons — of a planned four-module
+  course, refracted for a &ldquo;managers&rdquo; audience profile. The platform
+  is under active development; this demo is a snapshot, not a product.</p>
+</div>
+
+<div class="cards">
+  <a class="card" href="course/index.html">
+    <h3>Course demo &rarr;</h3>
+    <p>The published managers version, served as the SCORM export's own HTML in
+       preview mode. Three lessons, with the knowledge checks and scenario
+       interactions live.</p>
+  </a>
+  <a class="card" href="report.html">
+    <h3>Run report &rarr;</h3>
+    <p>What the pipeline did to produce it: the touch list and its reasons,
+       every block before and after, the deterministic check results, and the
+       one adaptation that was reverted.</p>
+  </a>
+</div>
+
+<h2>How it is built</h2>
+<p>Python 3.12 and FastAPI at the root, Next.js 16 in <code>web/</code>,
+Postgres via Supabase, SCORM 1.2 generated server-side. The adaptation
+pipeline, the check suite and the SCORM exporter are the parts worth reading;
+each was built from a written brief in <code>docs/</code>, and the briefs
+record the design decisions and the acceptance criteria rather than just the
+outcome.</p>
+<p><a href="https://github.com/nathanpwilliams/refract">Read the source on GitHub</a> — it is
+source-available for review; see the licence note in the footer.</p>
+
+</main>
+</div>
+<footer class="site">
+  <div class="inner">
+    <p>Refract — source-available, all rights reserved. Copyright &copy; 2026
+       Nathan Williams. Published for review and evaluation; no licence to use
+       is granted. See
+       <a href="https://github.com/nathanpwilliams/refract/blob/main/LICENSE-NOTICE">LICENSE-NOTICE</a>.</p>
+    <p>Course content is a sample for demonstration.
+       <a href="https://github.com/nathanpwilliams/refract">Source repository</a>.</p>
+  </div>
+</footer>
+</body>
+</html>
