@@ -37,18 +37,30 @@ the architecture is a direct response to each:
 
 ### Pipeline stages
 
-**PLAN → REWRITE → VERIFY → REVIEW → PUBLISH**
+**PLAN → REWRITE → CHECKS → VERIFY ×2 → FALLBACK → DISPOSITION → PUBLISH**
 
-- **PLAN** reads the course outline and a structured *audience profile*
-  (role, reading context, AI failure modes, redline emphasis) and plans
-  the adaptation.
-- **REWRITE** adapts blocks lesson-by-lesson at temperature 0.3.
-- **VERIFY** re-reads canonical against adapted at temperature 0.0 and
-  attaches findings to each pair.
-- **REVIEW** surfaces original vs. generated side by side with the
-  verifier's findings; a human accepts, edits, or rejects per block.
-- **PUBLISH** refuses with HTTP 409 while any revision is still pending.
-  That refusal *is* the guarantee — it cannot be satisfied by a model.
+- **PLAN** reads the course outline — every block, with its type, its
+  `adaptable` flag, and a prose preview — plus a structured *audience
+  profile* (role context, artifacts, AI failure modes, redline emphasis),
+  and emits a **touch list**: which blocks to adapt, and why.
+- **REWRITE** adapts only the touched blocks, each under its own
+  instruction and a computed word budget, at temperature 0.3.
+- **CHECKS** runs the deterministic suite over the version *read back
+  from the database* against canonical.
+- **VERIFY** runs twice, on two different models at temperature 0.0,
+  merging findings with a source tag.
+- **FALLBACK** reverts any touched block that failed a check or drew a
+  blocker to its canonical text — in code, before a model is consulted
+  about it — then re-reads the version to prove each reversion took.
+- **DISPOSITION** judges the surviving adaptations, with the canonical
+  as the explicit null preference: in doubt, revert.
+- **PUBLISH** happens automatically, with the surviving adaptations, or
+  the version **halts** for the five things a reversion cannot cure.
+
+A halted version is a diagnostic artifact rather than a review queue:
+the publish endpoint refuses it with HTTP 409, machine-disposed
+revisions cannot be edited by hand, and the fix is to change the
+canonical, the profile, or the prompts and re-run.
 
 Jobs run through an `adaptation_jobs` table claimed with
 `FOR UPDATE SKIP LOCKED` by an in-process worker. No Redis, no Celery —
@@ -85,20 +97,42 @@ runs over the adapted version against canonical:
 - `structure_integrity` — block types unchanged, nothing added, removed,
   or reordered
 - `vocabulary_ban` — the profile's avoid-list terms absent
+- `revert_integrity` — every reverted block byte-identical to canonical,
+  re-read from storage
 
 These have perfect recall for what they cover, which is the point: they
 are the warranty's deterministic floor. Above that floor sit
-cross-model verification (two models at temperature 0; a blocker from
-either halts the run) and recorded provenance — models used, prompt
-versions, touch rate, check results, and a SHA-256 over the canonical's
-ordered block contents — so a published version can be traced back to
-exactly what produced it.
+cross-model verification (two models at temperature 0) and recorded
+provenance — models used, prompt versions, touch rate, check results,
+dispositions, and a SHA-256 over the canonical's ordered block contents
+— so a published version can be traced back to exactly what produced it.
 
-**Build status:** stages PLAN → REWRITE → VERIFY → human review →
-publish are implemented and have been run end-to-end against live
-content. Sparse refraction, the deterministic check suite, cross-model
-verification, and the provenance record are fully specified and are the
-active build.
+Failures are handled **per block**: a defective adaptation is reverted
+to canonical and the rest of the version still publishes. The run halts
+only for what reverting cannot cure — an untouched or locked block that
+failed integrity, a structural change, a reversion that didn't take,
+zero surviving adaptations, or a disposition that says reverting isn't
+enough.
+
+**Build status: implemented and live.** The flagship canonical (38
+blocks) refracted to the *managers* role profile, auto-published
+2026-11-26:
+
+| | |
+| --- | --- |
+| Touch rate | **10 of 38 blocks (26%)** — 28 copied with no model contact |
+| Deterministic checks | **93 run, 92 passed** |
+| Verifier findings | **0** from either model |
+| Adaptations | **10 planned, 9 published, 1 reverted** (a +41% length overrun) |
+| Human review steps | **0** |
+
+The single reverted block was caught by `length_budget`, restored to
+canonical in code, and re-verified byte-identical before publish. Three
+earlier runs halted — on length overruns, an answer key whose
+rewrite moved the decision being tested, and verifier findings that
+contradicted the computed length bound. Each halt was a prompt or rule
+fix, and every one of them is in the git history rather than smoothed
+over.
 
 ### Tenant isolation, from two directions
 
@@ -158,9 +192,10 @@ then seed with `python scripts/seed.py`.
 ```
 POST /adaptation/jobs                        queue an adaptation
 GET  /adaptation/jobs/{id}                   job status
-GET  /adaptation/jobs/{id}/revisions         review feed (original vs generated)
-POST /adaptation/revisions/{id}/review       accept / edit / reject
-POST /adaptation/versions/{id}/publish       409 while revisions are pending
+GET  /adaptation/jobs/{id}/evidence          the run's warranty record
+GET  /adaptation/jobs/{id}/revisions         per-block diff + dispositions
+POST /adaptation/revisions/{id}/review       accept / edit / reject (human tier)
+POST /adaptation/versions/{id}/publish       409 if halted, or review pending
 GET  /adaptation/versions/{id}/scorm         SCORM 1.2 zip (published only)
 ```
 
